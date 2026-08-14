@@ -9,7 +9,22 @@ permissions:
   contents: write
 
 jobs:
+  # Pre-create the draft release so the parallel matrix jobs below all find
+  # it and only upload assets. Without this, electron-builder's non-atomic
+  # find-or-create logic races and produces duplicate draft releases.
+  create-release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Create draft release for tag
+        run: |
+          gh release view "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1 || \
+            gh release create "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" \
+              --draft --title "${GITHUB_REF_NAME#v}" --verify-tag
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
   release-mac:
+    needs: create-release
     strategy:
       matrix:
         include:
