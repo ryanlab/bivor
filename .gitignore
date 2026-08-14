@@ -1,0 +1,10 @@
+node_modules/
+out/
+dist/
+.DS_Store
+*.log
+*.tsbuildinfo
+.env
+.env.*
+.pnpm-store/
+.wt-probe/

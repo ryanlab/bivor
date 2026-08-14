@@ -1,0 +1,35 @@
+appId: io.github.ryanlab.bivor
+productName: Bivor
+directories:
+  output: dist
+  buildResources: build
+files:
+  - out/**
+  - package.json
+asarUnpack:
+  - node_modules/@earendil-works/**
+npmRebuild: false
+mac:
+  category: public.app-category.developer-tools
+  icon: build/icon.icns
+  # arch is passed on the CLI (--arm64 / --x64); each CI runner builds its own arch
+  # so node-pty is always compiled natively
+  target:
+    - dmg
+    - zip
+  artifactName: ${productName}-${version}-${arch}.${ext}
+  identity: null
+  darkModeSupport: true
+dmg:
+  title: Bivor
+  contents:
+    - x: 130
+      y: 220
+    - x: 410
+      y: 220
+      type: link
+      path: /Applications
+publish:
+  provider: github
+  owner: ryanlab
+  repo: bivor

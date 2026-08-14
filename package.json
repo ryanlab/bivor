@@ -1,0 +1,71 @@
+{
+  "name": "bivor",
+  "productName": "Bivor",
+  "version": "0.1.0",
+  "description": "Bivor — a desktop workbench for the pi coding agent",
+  "main": "out/main/index.js",
+  "type": "module",
+  "scripts": {
+    "dev": "electron-vite dev",
+    "build": "electron-vite build",
+    "start": "electron-vite preview",
+    "typecheck": "tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.web.json",
+    "dist:mac": "electron-vite build && electron-builder --mac"
+  },
+  "author": "ryanlab",
+  "license": "MIT",
+  "homepage": "https://github.com/ryanlab/bivor",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ryanlab/bivor.git"
+  },
+  "bugs": {
+    "url": "https://github.com/ryanlab/bivor/issues"
+  },
+  "packageManager": "pnpm@10.13.1",
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "electron",
+      "esbuild",
+      "electron-winstaller",
+      "@google/genai",
+      "protobufjs",
+      "node-pty"
+    ]
+  },
+  "devDependencies": {
+    "@electron/rebuild": "^4.2.0",
+    "@types/node": "^26.2.0",
+    "@types/react": "^19.2.18",
+    "@types/react-dom": "^19.2.4",
+    "@types/ws": "^8.18.1",
+    "@vitejs/plugin-react": "^5.2.0",
+    "electron": "^43.4.0",
+    "electron-builder": "^26.15.3",
+    "electron-vite": "^5.0.0",
+    "typescript": "^7.0.2",
+    "vite": "^7.3.3",
+    "ws": "^8.21.3"
+  },
+  "dependencies": {
+    "@e2b/desktop": "^2.3.1",
+    "@earendil-works/pi-coding-agent": "^0.84.1",
+    "@sinclair/typebox": "^0.34.52",
+    "@tailwindcss/vite": "^4.3.3",
+    "@xterm/addon-fit": "^0.11.0",
+    "@xterm/xterm": "^6.0.0",
+    "@xyflow/react": "^12.11.3",
+    "clsx": "^2.1.1",
+    "lucide-react": "^1.31.0",
+    "node-html-markdown": "^2.0.0",
+    "node-pty": "^1.1.0",
+    "puppeteer-core": "^25.7.0",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8",
+    "react-markdown": "^10.1.0",
+    "remark-gfm": "^4.0.1",
+    "shiki": "^4.4.3",
+    "tailwindcss": "^4.3.3",
+    "zustand": "^5.0.14"
+  }
+}
