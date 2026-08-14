@@ -8,3 +8,4 @@ dist/
 .env.*
 .pnpm-store/
 .wt-probe/
+.cursor/
