@@ -1,12 +1,42 @@
-# Bivor
+<p align="center">
+  <img src="docs/logo.png" width="64" alt="Bivor">
+</p>
 
-[English](README.md) | **简体中文**
+<h1 align="center">Bivor</h1>
 
-**Bivor**(取自 *beaver*,海狸——勤奋的建造者)是 [pi coding agent](https://github.com/badlogic/pi-mono) 的 macOS 桌面工作台,对标 Codex / Claude 桌面端体验,并在可视化 harness 编排、护栏治理、云端 VM 沙箱、git worktree 并行任务上走得更远。
+<p align="center">基于 pi coding agent 的 macOS 桌面工作台。</p>
 
-![icon](build/icon.png)
+<p align="center">
+  <a href="https://github.com/ryanlab/bivor/releases"><img alt="Release" src="https://img.shields.io/github/v/release/ryanlab/bivor?style=flat-square&color=c2410c" /></a>
+  <a href="https://github.com/ryanlab/bivor/actions/workflows/ci.yml"><img alt="CI" src="https://img.shields.io/github/actions/workflow/status/ryanlab/bivor/ci.yml?branch=main&style=flat-square" /></a>
+  <a href="LICENSE"><img alt="License" src="https://img.shields.io/github/license/ryanlab/bivor?style=flat-square" /></a>
+  <a href="https://github.com/ryanlab/bivor/stargazers"><img alt="Stars" src="https://img.shields.io/github/stars/ryanlab/bivor?style=flat-square" /></a>
+</p>
 
-每个会话都在独立的 Electron utility process 中运行 pi SDK(`AgentSessionRuntime`)。会话、认证、技能、提示模板、MCP 配置与 pi CLI 完全互通(`~/.pi/agent/`),终端与桌面端可以随时切换。
+<p align="center">
+  <img alt="Electron" src="https://img.shields.io/badge/Electron-43-47848F?style=flat-square&logo=electron&logoColor=white" />
+  <img alt="React" src="https://img.shields.io/badge/React-19-61DAFB?style=flat-square&logo=react&logoColor=black" />
+  <img alt="TypeScript" src="https://img.shields.io/badge/TypeScript-3178C6?style=flat-square&logo=typescript&logoColor=white" />
+  <img alt="pnpm" src="https://img.shields.io/badge/pnpm-10-F69220?style=flat-square&logo=pnpm&logoColor=white" />
+  <img alt="macOS" src="https://img.shields.io/badge/macOS-000000?style=flat-square&logo=apple&logoColor=white" />
+</p>
+
+<p align="center">
+  <a href="README.md">English</a> |
+  <a href="README.zh-CN.md"><b>简体中文</b></a>
+</p>
+
+<p align="center">
+  <a href="#功能">功能</a> ·
+  <a href="#安装">安装</a> ·
+  <a href="#从源码开发">开发</a> ·
+  <a href="#架构">架构</a> ·
+  <a href="#许可">许可</a>
+</p>
+
+**Bivor**（取自 *beaver*，海狸——勤奋的建造者）是基于 [pi coding agent](https://github.com/badlogic/pi-mono) 的 macOS 桌面工作台，对标 Codex / Claude 桌面端体验，并在可视化 harness 编排、护栏治理、云端 VM 沙箱、git worktree 并行任务上走得更远。
+
+每个会话都在独立的 Electron utility process 中运行 pi SDK（`AgentSessionRuntime`）。会话、认证、技能、提示模板、MCP 配置与 pi CLI 完全互通（`~/.pi/agent/`），终端与桌面端可以随时切换。
 
 ## 功能
 
@@ -84,7 +114,8 @@
 
 从 [Releases](https://github.com/ryanlab/bivor/releases) 下载最新 DMG——Apple Silicon 选 `arm64`,Intel 机型选 `x64`。
 
-> 当前构建未签名(暂无 Apple 开发者证书)。首次启动请右键应用 → **打开**,或清除隔离属性:`xattr -cr /Applications/Bivor.app`。
+> [!WARNING]
+> 当前构建未签名（暂无 Apple 开发者证书）。首次启动请右键应用 → **打开**，或清除隔离属性：`xattr -cr /Applications/Bivor.app`。
 
 ## 从源码开发
 

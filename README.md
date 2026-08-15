@@ -1,10 +1,40 @@
-# Bivor
+<p align="center">
+  <img src="docs/logo.png" width="80" alt="Bivor">
+</p>
 
-**English** | [简体中文](README.zh-CN.md)
+<h1 align="center">Bivor</h1>
 
-**Bivor** (from *beaver* — the industrious builder) is a macOS desktop workbench for the [pi coding agent](https://github.com/badlogic/pi-mono), built to match the experience of Codex / Claude desktop apps — and go further with visual harness orchestration, guardrails, cloud VM sandboxes, and parallel git-worktree tasks.
+<p align="center">A macOS desktop workbench based on the pi coding agent.</p>
 
-![icon](build/icon.png)
+<p align="center">
+  <a href="https://github.com/ryanlab/bivor/releases"><img alt="Release" src="https://img.shields.io/github/v/release/ryanlab/bivor?style=flat-square&color=c2410c" /></a>
+  <a href="https://github.com/ryanlab/bivor/actions/workflows/ci.yml"><img alt="CI" src="https://img.shields.io/github/actions/workflow/status/ryanlab/bivor/ci.yml?branch=main&style=flat-square" /></a>
+  <a href="LICENSE"><img alt="License" src="https://img.shields.io/github/license/ryanlab/bivor?style=flat-square" /></a>
+  <a href="https://github.com/ryanlab/bivor/stargazers"><img alt="Stars" src="https://img.shields.io/github/stars/ryanlab/bivor?style=flat-square" /></a>
+</p>
+
+<p align="center">
+  <img alt="Electron" src="https://img.shields.io/badge/Electron-43-47848F?style=flat-square&logo=electron&logoColor=white" />
+  <img alt="React" src="https://img.shields.io/badge/React-19-61DAFB?style=flat-square&logo=react&logoColor=black" />
+  <img alt="TypeScript" src="https://img.shields.io/badge/TypeScript-3178C6?style=flat-square&logo=typescript&logoColor=white" />
+  <img alt="pnpm" src="https://img.shields.io/badge/pnpm-10-F69220?style=flat-square&logo=pnpm&logoColor=white" />
+  <img alt="macOS" src="https://img.shields.io/badge/macOS-000000?style=flat-square&logo=apple&logoColor=white" />
+</p>
+
+<p align="center">
+  <a href="README.md"><b>English</b></a> |
+  <a href="README.zh-CN.md">简体中文</a>
+</p>
+
+<p align="center">
+  <a href="#features">Features</a> ·
+  <a href="#install">Install</a> ·
+  <a href="#developing-from-source">Develop</a> ·
+  <a href="#architecture">Architecture</a> ·
+  <a href="#license">License</a>
+</p>
+
+**Bivor** (from *beaver* — the industrious builder) is a macOS desktop workbench based on the [pi coding agent](https://github.com/badlogic/pi-mono), built to match the experience of Codex / Claude desktop apps — and go further with visual harness orchestration, guardrails, cloud VM sandboxes, and parallel git-worktree tasks.
 
 Each chat runs the pi SDK (`AgentSessionRuntime`) inside its own isolated Electron utility process. Sessions, auth, skills, prompts, and MCP config are fully shared with the pi CLI under `~/.pi/agent/`, so you can move between the terminal and the desktop app freely.
 
@@ -84,6 +114,7 @@ Pick how much power each chat gets — presets gate tools and UI surfaces:
 
 Download the latest DMG from [Releases](https://github.com/ryanlab/bivor/releases) — `arm64` for Apple Silicon, `x64` for Intel Macs.
 
+> [!WARNING]
 > Builds are currently unsigned (no Apple Developer certificate yet). On first launch, right-click the app → **Open**, or clear the quarantine flag: `xattr -cr /Applications/Bivor.app`.
 
 ## Developing from source
