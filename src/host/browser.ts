@@ -16,17 +16,40 @@ type Page = import("puppeteer-core").Page;
 let browser: Browser | undefined;
 let page: Page | undefined;
 
-const CHROME_PATHS = [
-  "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
-  "/Applications/Chromium.app/Contents/MacOS/Chromium",
-  "/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge",
-];
+function chromeCandidates(): string[] {
+  if (process.platform === "darwin") {
+    return [
+      "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+      "/Applications/Chromium.app/Contents/MacOS/Chromium",
+      "/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge",
+    ];
+  }
+  if (process.platform === "win32") {
+    const roots = [
+      process.env.ProgramFiles,
+      process.env["ProgramFiles(x86)"],
+      process.env.LOCALAPPDATA,
+    ].filter((r): r is string => Boolean(r));
+    return [
+      ...roots.map((r) => join(r, "Google", "Chrome", "Application", "chrome.exe")),
+      ...roots.map((r) => join(r, "Microsoft", "Edge", "Application", "msedge.exe")),
+      ...roots.map((r) => join(r, "Chromium", "Application", "chrome.exe")),
+    ];
+  }
+  return [
+    "/usr/bin/google-chrome",
+    "/usr/bin/google-chrome-stable",
+    "/usr/bin/chromium",
+    "/usr/bin/chromium-browser",
+    "/usr/bin/microsoft-edge",
+  ];
+}
 
 function findChrome(): string {
   if (process.env.CHROME_PATH && existsSync(process.env.CHROME_PATH)) {
     return process.env.CHROME_PATH;
   }
-  const found = CHROME_PATHS.find((p) => existsSync(p));
+  const found = chromeCandidates().find((p) => existsSync(p));
   if (!found) {
     throw new Error("未找到本机 Chrome / Chromium / Edge。可用 CHROME_PATH 环境变量指定路径。");
   }

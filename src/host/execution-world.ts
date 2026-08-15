@@ -7,12 +7,14 @@
  * 文件读写与命令执行被替换。模型词表不变，护栏规则（按 bash 名字
  * 匹配的命令规则）在两个世界同样生效。
  */
+import { sep } from "node:path";
 import {
   createBashToolDefinition,
   createEditToolDefinition,
   createLocalBashOperations,
   createReadToolDefinition,
   createWriteToolDefinition,
+  getShellConfig,
   type BashOperations,
   type EditOperations,
   type ReadOperations,
@@ -94,15 +96,42 @@ function cleanForModel(data: string): string {
   return data.replace(ANSI_RE, "").replaceAll("\r\n", "\n").replace(/\r+/g, "\n");
 }
 
+interface PtyShellSpec {
+  file: string;
+  args: string[];
+}
+
+/**
+ * 每命令 PTY 用的 shell。POSIX 直接 /bin/sh；Windows 复用 pi SDK 的
+ * bash 解析（Git Bash / MSYS2 等）。找不到可用 bash（或只有走 stdin
+ * 传输的 WSL bash，无法配合 PTY argv）时返回 null，调用方降级为
+ * 管道执行——SDK 会抛出带安装指引的错误。
+ */
+let cachedPtyShell: PtyShellSpec | null | undefined;
+function ptyShellSpec(): PtyShellSpec | null {
+  if (process.platform !== "win32") return { file: "/bin/sh", args: ["-c"] };
+  if (cachedPtyShell === undefined) {
+    try {
+      const cfg = getShellConfig();
+      cachedPtyShell =
+        cfg.commandTransport === "stdin" ? null : { file: cfg.shell, args: [...cfg.args] };
+    } catch {
+      cachedPtyShell = null;
+    }
+  }
+  return cachedPtyShell;
+}
+
 /** 在 PTY 里跑一条命令：输出原样进终端视图，清洗后进工具结果。 */
 function execInPty(
   pty: PtyModule,
+  shell: PtyShellSpec,
   command: string,
   cwd: string,
   options: { onData?: (data: Buffer) => void; signal?: AbortSignal; timeout?: number },
 ): Promise<{ exitCode: number | null }> {
   return new Promise((resolve) => {
-    const proc = pty.spawn("/bin/sh", ["-c", command], {
+    const proc = pty.spawn(shell.file, [...shell.args, command], {
       name: "xterm-256color",
       cwd,
       cols: agentTermSize.cols,
@@ -172,8 +201,9 @@ async function execLocalTee(
   const badge = sandboxMode === "off" ? "" : `\x1b[33m[sandbox:${sandboxMode}]\x1b[0m `;
   termNotify(`${badge}\x1b[2m$\x1b[0m \x1b[1m${command}\x1b[0m\r\n`);
   const wrapped = wrapLocalSandbox(command, cwd);
-  const result = pty
-    ? await execInPty(pty, wrapped, cwd, options)
+  const ptyShell = pty ? ptyShellSpec() : null;
+  const result = pty && ptyShell
+    ? await execInPty(pty, ptyShell, wrapped, cwd, options)
     : await createLocalBashOperations().exec(wrapped, cwd, {
         ...options,
         onData: (data: Buffer) => {
@@ -203,8 +233,10 @@ export function onWorldChange(fn: (world: ExecutionWorld) => void): void {
 /** 本机绝对路径 → VM 路径：cwd 内的文件映射进 VM workspace，其余原样。 */
 function mapToVmPath(absolutePath: string): string {
   if (absolutePath === localCwd) return VM_WORKSPACE;
-  if (absolutePath.startsWith(`${localCwd}/`)) {
-    return `${VM_WORKSPACE}/${absolutePath.slice(localCwd.length + 1)}`;
+  const prefix = localCwd.endsWith(sep) ? localCwd : localCwd + sep;
+  if (absolutePath.startsWith(prefix)) {
+    const rel = absolutePath.slice(prefix.length).split(sep).join("/");
+    return `${VM_WORKSPACE}/${rel}`;
   }
   return absolutePath;
 }

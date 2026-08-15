@@ -242,6 +242,9 @@ const api = {
     setBadge: (count: number): void => {
       ipcRenderer.send(IPC.setBadge, count);
     },
+    setTitleBarOverlay: (colors: { color: string; symbolColor: string }): void => {
+      ipcRenderer.send(IPC.setTitleBarOverlay, colors);
+    },
     onMenuAction: (listener: (action: string) => void): (() => void) => {
       const handler = (_event: unknown, action: string): void => listener(action);
       ipcRenderer.on("menu:action", handler);

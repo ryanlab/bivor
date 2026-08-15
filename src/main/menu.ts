@@ -8,25 +8,32 @@ function send(action: MenuAction): void {
 }
 
 export function installMenu(): void {
+  const isMac = process.platform === "darwin";
+  const settingsItem: Electron.MenuItemConstructorOptions = {
+    label: mt("menu.settings"),
+    accelerator: "CmdOrCtrl+,",
+    click: () => send("open-settings"),
+  };
   const template: Electron.MenuItemConstructorOptions[] = [
-    {
-      label: app.name,
-      submenu: [
-        { role: "about", label: mt("menu.about") },
-        { type: "separator" },
-        {
-          label: mt("menu.settings"),
-          accelerator: "CmdOrCtrl+,",
-          click: () => send("open-settings"),
-        },
-        { type: "separator" },
-        { role: "hide", label: mt("menu.hide") },
-        { role: "hideOthers" },
-        { role: "unhide" },
-        { type: "separator" },
-        { role: "quit", label: mt("menu.quit") },
-      ],
-    },
+    // macOS 专属的应用名菜单；其他平台的设置/退出并入 File 菜单
+    ...(isMac
+      ? ([
+          {
+            label: app.name,
+            submenu: [
+              { role: "about", label: mt("menu.about") },
+              { type: "separator" },
+              settingsItem,
+              { type: "separator" },
+              { role: "hide", label: mt("menu.hide") },
+              { role: "hideOthers" },
+              { role: "unhide" },
+              { type: "separator" },
+              { role: "quit", label: mt("menu.quit") },
+            ],
+          },
+        ] satisfies Electron.MenuItemConstructorOptions[])
+      : []),
     {
       label: mt("menu.file"),
       submenu: [
@@ -41,7 +48,13 @@ export function installMenu(): void {
           click: () => send("open-project"),
         },
         { type: "separator" },
-        { role: "close" },
+        ...(isMac
+          ? ([{ role: "close" }] satisfies Electron.MenuItemConstructorOptions[])
+          : ([
+              settingsItem,
+              { type: "separator" },
+              { role: "quit", label: mt("menu.quit") },
+            ] satisfies Electron.MenuItemConstructorOptions[])),
       ],
     },
     {
@@ -71,7 +84,9 @@ export function installMenu(): void {
     },
     {
       label: mt("menu.window"),
-      submenu: [{ role: "minimize" }, { role: "zoom" }, { role: "front" }],
+      submenu: isMac
+        ? [{ role: "minimize" }, { role: "zoom" }, { role: "front" }]
+        : [{ role: "minimize" }, { role: "close" }],
     },
     {
       label: mt("menu.help"),
@@ -81,6 +96,12 @@ export function installMenu(): void {
           label: mt("menu.docs"),
           click: () => void shell.openExternal("https://pi.dev/docs"),
         },
+        ...(isMac
+          ? []
+          : ([
+              { type: "separator" },
+              { role: "about", label: mt("menu.about") },
+            ] satisfies Electron.MenuItemConstructorOptions[])),
       ],
     },
   ];

@@ -23,6 +23,7 @@ import {
 import { useAppStore } from "@/stores/app-store";
 import { basename, formatRelativeTime } from "@/lib/format";
 import { cn } from "@/lib/cn";
+import { shortcutHint } from "@/lib/platform";
 import { useT } from "@/lib/i18n";
 
 interface Item {
@@ -61,7 +62,7 @@ export function CommandPalette(): React.JSX.Element | null {
         id: "new-task",
         icon: <Plus size={14} />,
         label: isDaily ? t("sidebar.newChat") : t("sidebar.newTask"),
-        hint: "⌘N",
+        hint: shortcutHint("N"),
         keywords: "new task chat xinrenwu xinduihua",
         run: () => {
           close();
@@ -86,7 +87,7 @@ export function CommandPalette(): React.JSX.Element | null {
         id: "home",
         icon: <LayoutGrid size={14} />,
         label: isDaily ? t("sidebar.overviewChat") : t("sidebar.overviewTask"),
-        hint: "⌘O",
+        hint: shortcutHint("O"),
         keywords: "mission control home zonglan",
         run: () => {
           close();
@@ -131,7 +132,7 @@ export function CommandPalette(): React.JSX.Element | null {
         id: "settings",
         icon: <Settings size={14} />,
         label: t("common.settings"),
-        hint: "⌘,",
+        hint: shortcutHint(","),
         keywords: "settings shezhi vercel deploy bushu",
         run: () => {
           close();
@@ -182,7 +183,7 @@ export function CommandPalette(): React.JSX.Element | null {
         id: "shortcuts",
         icon: <Keyboard size={14} />,
         label: t("palette.shortcuts"),
-        hint: "⌘/",
+        hint: shortcutHint("/"),
         keywords: "shortcuts keyboard kuaijiejian",
         run: () => {
           close();

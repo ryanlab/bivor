@@ -50,13 +50,17 @@ export function formatTime(ts: number, opts?: Intl.DateTimeFormatOptions): strin
 }
 
 export function basename(path: string): string {
-  return path.replace(/\/+$/, "").split("/").pop() ?? path;
+  return path.replace(/[\\/]+$/, "").split(/[\\/]/).pop() ?? path;
 }
 
 export function shortenPath(path: string, maxLen = 40): string {
-  const home = path.replace(/^\/Users\/[^/]+/, "~");
+  // macOS 的 /Users/<name> 与 Windows 的 C:\Users\<name> 都折叠成 ~
+  const home = path
+    .replace(/^\/Users\/[^/]+/, "~")
+    .replace(/^[A-Za-z]:[\\/](?:Users)[\\/][^\\/]+/, "~");
   if (home.length <= maxLen) return home;
-  const parts = home.split("/");
+  const sep = home.includes("/") ? "/" : "\\";
+  const parts = home.split(/[\\/]/);
   if (parts.length <= 3) return home;
-  return `${parts[0]}/…/${parts.slice(-2).join("/")}`;
+  return `${parts[0]}${sep}…${sep}${parts.slice(-2).join(sep)}`;
 }

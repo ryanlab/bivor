@@ -86,6 +86,10 @@ import {
 } from "./services";
 
 const isDev = !app.isPackaged;
+const isMac = process.platform === "darwin";
+
+/** 标题栏行高 48px（h-12），Windows/Linux 的窗口控件 overlay 与之对齐。 */
+const TITLEBAR_HEIGHT = 48;
 
 function createWindow(): BrowserWindow {
   const win = new BrowserWindow({
@@ -94,8 +98,15 @@ function createWindow(): BrowserWindow {
     minWidth: 960,
     minHeight: 600,
     show: false,
-    titleBarStyle: "hiddenInset",
-    trafficLightPosition: { x: 16, y: 14 },
+    // macOS 用 hiddenInset 红绿灯；其他平台用 Window Controls Overlay，
+    // 配色由 renderer 在主题切换时通过 IPC 同步。
+    ...(isMac
+      ? { titleBarStyle: "hiddenInset" as const, trafficLightPosition: { x: 16, y: 14 } }
+      : {
+          titleBarStyle: "hidden" as const,
+          titleBarOverlay: { color: "#1f1e1b", symbolColor: "#b8b2a5", height: TITLEBAR_HEIGHT },
+        }),
+    ...(isDev && !isMac ? { icon: join(app.getAppPath(), "build", "icon.png") } : {}),
     backgroundColor: "#0d0d0f",
     webPreferences: {
       preload: join(import.meta.dirname, "../preload/index.mjs"),
@@ -298,6 +309,17 @@ function registerIpc(): void {
   // Dock/taskbar badge = number of approvals waiting across all chats.
   ipcMain.on(IPC.setBadge, (_e, count: number) => {
     app.setBadgeCount(Math.max(0, Math.floor(count) || 0));
+  });
+
+  // Windows/Linux：主题切换时同步窗口控件 overlay 配色（macOS 无 overlay）。
+  ipcMain.on(IPC.setTitleBarOverlay, (e, colors: { color: string; symbolColor: string }) => {
+    if (isMac) return;
+    const win = BrowserWindow.fromWebContents(e.sender);
+    try {
+      win?.setTitleBarOverlay({ ...colors, height: TITLEBAR_HEIGHT });
+    } catch {
+      // overlay 未启用（如 Linux 某些环境）时忽略
+    }
   });
 
   // 定时任务

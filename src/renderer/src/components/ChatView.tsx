@@ -27,7 +27,7 @@ import { Composer } from "@/components/Composer";
 import { ChangesPanel, collectChanges } from "@/components/ChangesPanel";
 import { WorktreeMergePanel } from "@/components/WorktreeMergePanel";
 import { TreePanel } from "@/components/TreePanel";
-import { WindowChrome, CollapsedTitlebar } from "@/components/WindowChrome";
+import { WindowChrome, CollapsedTitlebar, WinControlsGap } from "@/components/WindowChrome";
 import { cn } from "@/lib/cn";
 import { Switch } from "@/components/Switch";
 import { ShieldQuestion } from "lucide-react";
@@ -577,6 +577,7 @@ export function ChatView({ chat }: { chat: ChatState }): React.JSX.Element {
             <FileJson size={14} />
           </button>
         )}
+        <WinControlsGap />
       </div>
 
       <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden">

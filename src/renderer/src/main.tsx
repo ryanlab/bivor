@@ -6,6 +6,7 @@ import { persistLocale, loadLocalePreference } from "./lib/locale";
 import { useAppStore } from "./stores/app-store";
 import "./styles/index.css";
 
+document.documentElement.dataset.platform = window.pi.system.platform;
 applyTheme(loadThemePreference());
 persistLocale(loadLocalePreference());
 watchSystemTheme(() => useAppStore.getState().theme);

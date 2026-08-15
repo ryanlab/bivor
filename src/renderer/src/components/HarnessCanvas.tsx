@@ -222,7 +222,7 @@ function SysPromptNode({ data }: NodeProps): React.JSX.Element {
             <div key={f.path} className="flex items-center gap-1.5 text-[10.5px]">
               <FileText size={10} className="shrink-0 text-fg-muted" />
               <span className="min-w-0 flex-1 truncate font-mono text-fg-secondary">
-                {f.path.split("/").slice(-2).join("/")}
+                {f.path.split(/[\\/]/).slice(-2).join("/")}
               </span>
               <span className="shrink-0 text-fg-muted">≈{estTokens(f.chars)}</span>
             </div>

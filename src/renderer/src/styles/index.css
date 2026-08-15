@@ -126,6 +126,13 @@ body {
   -webkit-app-region: no-drag;
 }
 
+/* Windows 窗口控件（WCO overlay）占用的宽度：
+   overlay 激活时 env(titlebar-area-width) = 窗口宽 - 控件宽，
+   其余平台回退 100vw → 间隙为 0。 */
+.wco-gap {
+  width: calc(100vw - env(titlebar-area-width, 100vw));
+}
+
 .font-serif-display {
   font-family: var(--font-serif);
   letter-spacing: -0.01em;
