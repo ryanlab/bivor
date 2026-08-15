@@ -724,6 +724,8 @@ export const IPC = {
   usageStats: "sessions:usage",
   readTextFile: "fs:readTextFile",
   windowControl: "window:control",
+  // Windows/Linux 标题栏 overlay 配色跟随主题（renderer -> main）
+  setTitleBarOverlay: "window:setTitleBarOverlay",
   // 交互终端（main 进程 node-pty，一个 chat 一个用户 shell）
   termCreate: "term:create",
   termInput: "term:input",

@@ -3,13 +3,18 @@
  * user gets a live desktop stream. Requires E2B_API_KEY (set in 设置 → 沙箱).
  */
 import { appendFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { Type } from "@sinclair/typebox";
 import type { ToolDefinition } from "@earendil-works/pi-coding-agent";
 import type { SandboxStatusPayload } from "@shared/protocol";
 
 const dlog = (msg: string): void => {
   try {
-    appendFileSync("/tmp/pi-sandbox.log", `${new Date().toISOString()} [${process.pid}] ${msg}\n`);
+    appendFileSync(
+      join(tmpdir(), "pi-sandbox.log"),
+      `${new Date().toISOString()} [${process.pid}] ${msg}\n`,
+    );
   } catch {
     // ignore
   }

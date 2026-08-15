@@ -4,7 +4,7 @@
 
 <h1 align="center">Bivor</h1>
 
-<p align="center">基于 pi coding agent 的 macOS 桌面工作台。</p>
+<p align="center">pi coding agent 的桌面工作台——macOS & Windows。</p>
 
 <p align="center">
   <a href="https://github.com/ryanlab/bivor/releases"><img alt="Release" src="https://img.shields.io/github/v/release/ryanlab/bivor?style=flat-square&color=c2410c" /></a>
@@ -19,6 +19,7 @@
   <img alt="TypeScript" src="https://img.shields.io/badge/TypeScript-3178C6?style=flat-square&logo=typescript&logoColor=white" />
   <img alt="pnpm" src="https://img.shields.io/badge/pnpm-10-F69220?style=flat-square&logo=pnpm&logoColor=white" />
   <img alt="macOS" src="https://img.shields.io/badge/macOS-000000?style=flat-square&logo=apple&logoColor=white" />
+  <img alt="Windows" src="https://img.shields.io/badge/Windows-0078D4?style=flat-square&logo=gitforwindows&logoColor=white" />
 </p>
 
 <p align="center">
@@ -34,7 +35,7 @@
   <a href="#许可">许可</a>
 </p>
 
-**Bivor**（取自 *beaver*，海狸——勤奋的建造者）是基于 [pi coding agent](https://github.com/badlogic/pi-mono) 的 macOS 桌面工作台，对标 Codex / Claude 桌面端体验，并在可视化 harness 编排、护栏治理、云端 VM 沙箱、git worktree 并行任务上走得更远。
+**Bivor**（取自 *beaver*，海狸——勤奋的建造者）是基于 [pi coding agent](https://github.com/badlogic/pi-mono) 的桌面工作台（macOS 与 Windows），对标 Codex / Claude 桌面端体验，并在可视化 harness 编排、护栏治理、云端 VM 沙箱、git worktree 并行任务上走得更远。
 
 每个会话都在独立的 Electron utility process 中运行 pi SDK（`AgentSessionRuntime`）。会话、认证、技能、提示模板、MCP 配置与 pi CLI 完全互通（`~/.pi/agent/`），终端与桌面端可以随时切换。
 
@@ -112,14 +113,22 @@
 
 ## 安装
 
-从 [Releases](https://github.com/ryanlab/bivor/releases) 下载最新 DMG——Apple Silicon 选 `arm64`,Intel 机型选 `x64`。
+从 [Releases](https://github.com/ryanlab/bivor/releases) 下载:
+
+- **macOS** — DMG,Apple Silicon 选 `arm64`,Intel 机型选 `x64`
+- **Windows** — `Bivor-Setup-*.exe` 安装包(按用户安装,无需管理员权限),或免安装的 `-win-x64.zip`
 
 > [!WARNING]
-> 当前构建未签名（暂无 Apple 开发者证书）。首次启动请右键应用 → **打开**，或清除隔离属性：`xattr -cr /Applications/Bivor.app`。
+> 当前构建未签名（暂无代码签名证书）。
+> - **macOS**:首次启动请右键应用 → **打开**，或清除隔离属性：`xattr -cr /Applications/Bivor.app`。
+> - **Windows**:若出现 SmartScreen 提示,点击**更多信息** → **仍要运行**。
+
+> [!NOTE]
+> Windows 上 agent 的 `bash` 工具需要 POSIX shell——请安装 [Git for Windows](https://git-scm.com/download/win)(自带 Git Bash);使用 git 相关功能本来也需要它。
 
 ## 从源码开发
 
-要求:macOS(Apple Silicon 或 Intel)、Node.js ≥ 20、[pnpm](https://pnpm.io)。
+要求:macOS(Apple Silicon 或 Intel)或 Windows 10+、Node.js ≥ 20、[pnpm](https://pnpm.io)。
 
 ```bash
 git clone https://github.com/ryanlab/bivor.git
@@ -128,7 +137,8 @@ pnpm install
 pnpm dev          # electron-vite dev(HMR)
 pnpm typecheck
 pnpm build        # 构建到 out/
-pnpm dist:mac     # 打包 DMG + ZIP 到 dist/
+pnpm dist:mac     # 打包 DMG + ZIP 到 dist/(macOS)
+pnpm dist:win     # 打包 NSIS 安装包 + ZIP 到 dist/(Windows)
 ```
 
 ### 配置

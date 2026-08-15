@@ -2,6 +2,17 @@ import { PanelLeft, Search } from "lucide-react";
 import { useAppStore } from "@/stores/app-store";
 import { cn } from "@/lib/cn";
 import { useT } from "@/lib/i18n";
+import { IS_MAC, IS_WINDOWS, MOD_LABEL } from "@/lib/platform";
+
+/**
+ * Windows 的窗口控件（WCO overlay）盖在窗口右上角；贴着窗口右缘的
+ * 标题栏行需要用这个间隙避开它。宽度由 CSS env(titlebar-area-width)
+ * 推出，非 Windows 平台上为 0（渲染 null）。
+ */
+export function WinControlsGap(): React.JSX.Element | null {
+  if (!IS_WINDOWS) return null;
+  return <div className="wco-gap h-full shrink-0" aria-hidden />;
+}
 
 /**
  * Claude-style window chrome: traffic-light inset, then a thin PanelLeft
@@ -11,11 +22,14 @@ import { useT } from "@/lib/i18n";
 export function WindowChrome({
   trafficLights = false,
   align = "start",
+  winControlsGap = false,
 }: {
-  /** Leave room for hiddenInset traffic lights (x:16, ~54px wide). */
+  /** Leave room for hiddenInset traffic lights (x:16, ~54px wide). macOS only. */
   trafficLights?: boolean;
   /** Put the sidebar/search buttons on the right of the flex row. */
   align?: "start" | "end";
+  /** 该行贴着窗口右缘时置 true，Windows 上为系统窗口控件留出空隙。 */
+  winControlsGap?: boolean;
 }): React.JSX.Element {
   const t = useT();
   const collapsed = useAppStore((s) => s.sidebarCollapsed);
@@ -27,11 +41,15 @@ export function WindowChrome({
 
   return (
     <>
-      {trafficLights && <div className="w-[72px] shrink-0" aria-hidden />}
+      {trafficLights && IS_MAC && <div className="w-[72px] shrink-0" aria-hidden />}
       {align === "end" && <div className="min-w-0 flex-1" aria-hidden />}
       <button
         type="button"
-        title={collapsed ? t("window.expandSidebar", { mod: "⌘" }) : t("window.collapseSidebar", { mod: "⌘" })}
+        title={
+          collapsed
+            ? t("window.expandSidebar", { mod: MOD_LABEL })
+            : t("window.collapseSidebar", { mod: MOD_LABEL })
+        }
         onClick={toggleSidebar}
         className={cn(
           "no-drag relative rounded-lg p-1.5 text-fg-muted transition-colors hover:bg-bg-hover hover:text-fg-secondary",
@@ -47,7 +65,7 @@ export function WindowChrome({
       </button>
       <button
         type="button"
-        title={t("window.search", { mod: "⌘" })}
+        title={t("window.search", { mod: MOD_LABEL })}
         onClick={() => setPaletteOpen(true)}
         className={cn(
           "no-drag rounded-lg p-1.5 text-fg-muted transition-colors hover:bg-bg-hover hover:text-fg-secondary",
@@ -56,6 +74,7 @@ export function WindowChrome({
       >
         <Search size={16} strokeWidth={1.7} />
       </button>
+      {winControlsGap && <WinControlsGap />}
     </>
   );
 }
@@ -66,7 +85,7 @@ export function CollapsedTitlebar(): React.JSX.Element | null {
   if (!collapsed) return null;
   return (
     <div className="drag-region flex h-12 shrink-0 items-center gap-0.5">
-      <WindowChrome trafficLights align="end" />
+      <WindowChrome trafficLights align="end" winControlsGap />
     </div>
   );
 }

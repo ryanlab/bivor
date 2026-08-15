@@ -21,7 +21,13 @@ const BACKLOG_LIMIT = 200_000;
 const terms = new Map<string, TermEntry>();
 
 function defaultShell(): string {
+  if (process.platform === "win32") return "powershell.exe";
   return process.env.SHELL || (process.platform === "darwin" ? "/bin/zsh" : "/bin/bash");
+}
+
+/** POSIX 用 login shell 读齐用户配置；PowerShell 无对应参数。 */
+function defaultShellArgs(): string[] {
+  return process.platform === "win32" ? [] : ["-l"];
 }
 
 /** xterm 在容器未完成布局时可能给出 NaN/0；PTY 要求正整数。 */
@@ -53,7 +59,7 @@ export function createTerminal(
   }
   existing?.pty.kill();
 
-  const pty = spawn(defaultShell(), ["-l"], {
+  const pty = spawn(defaultShell(), defaultShellArgs(), {
     name: "xterm-256color",
     cwd,
     cols: size.cols,

@@ -1,9 +1,9 @@
 import { Keyboard, X } from "lucide-react";
 import { useAppStore } from "@/stores/app-store";
 import { useT } from "@/lib/i18n";
+import { IS_MAC } from "@/lib/platform";
 
-const isMac = navigator.platform.startsWith("Mac");
-const MOD = isMac ? "⌘" : "Ctrl";
+const MOD = IS_MAC ? "⌘" : "Ctrl";
 
 export function ShortcutsOverlay({ onClose }: { onClose: () => void }): React.JSX.Element {
   const t = useT();

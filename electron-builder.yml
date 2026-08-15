@@ -29,6 +29,18 @@ dmg:
       y: 220
       type: link
       path: /Applications
+win:
+  icon: build/icon.ico
+  # 与 mac 产物区分（zip 两端都有）：加 win- 前缀避免同名冲突
+  artifactName: ${productName}-${version}-win-${arch}.${ext}
+  target:
+    - nsis
+    - zip
+nsis:
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+  artifactName: ${productName}-Setup-${version}-${arch}.${ext}
 publish:
   provider: github
   owner: ryanlab

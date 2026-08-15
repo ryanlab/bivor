@@ -4,7 +4,7 @@
 
 <h1 align="center">Bivor</h1>
 
-<p align="center">A macOS desktop workbench based on the pi coding agent.</p>
+<p align="center">A desktop workbench for the pi coding agent — macOS &amp; Windows.</p>
 
 <p align="center">
   <a href="https://github.com/ryanlab/bivor/releases"><img alt="Release" src="https://img.shields.io/github/v/release/ryanlab/bivor?style=flat-square&color=c2410c" /></a>
@@ -19,6 +19,7 @@
   <img alt="TypeScript" src="https://img.shields.io/badge/TypeScript-3178C6?style=flat-square&logo=typescript&logoColor=white" />
   <img alt="pnpm" src="https://img.shields.io/badge/pnpm-10-F69220?style=flat-square&logo=pnpm&logoColor=white" />
   <img alt="macOS" src="https://img.shields.io/badge/macOS-000000?style=flat-square&logo=apple&logoColor=white" />
+  <img alt="Windows" src="https://img.shields.io/badge/Windows-0078D4?style=flat-square&logo=gitforwindows&logoColor=white" />
 </p>
 
 <p align="center">
@@ -34,7 +35,7 @@
   <a href="#license">License</a>
 </p>
 
-**Bivor** (from *beaver* — the industrious builder) is a macOS desktop workbench based on the [pi coding agent](https://github.com/badlogic/pi-mono), built to match the experience of Codex / Claude desktop apps — and go further with visual harness orchestration, guardrails, cloud VM sandboxes, and parallel git-worktree tasks.
+**Bivor** (from *beaver* — the industrious builder) is a desktop workbench for macOS and Windows based on the [pi coding agent](https://github.com/badlogic/pi-mono), built to match the experience of Codex / Claude desktop apps — and go further with visual harness orchestration, guardrails, cloud VM sandboxes, and parallel git-worktree tasks.
 
 Each chat runs the pi SDK (`AgentSessionRuntime`) inside its own isolated Electron utility process. Sessions, auth, skills, prompts, and MCP config are fully shared with the pi CLI under `~/.pi/agent/`, so you can move between the terminal and the desktop app freely.
 
@@ -112,14 +113,22 @@ Pick how much power each chat gets — presets gate tools and UI surfaces:
 
 ## Install
 
-Download the latest DMG from [Releases](https://github.com/ryanlab/bivor/releases) — `arm64` for Apple Silicon, `x64` for Intel Macs.
+Download from [Releases](https://github.com/ryanlab/bivor/releases):
+
+- **macOS** — DMG, `arm64` for Apple Silicon, `x64` for Intel Macs
+- **Windows** — `Bivor-Setup-*.exe` installer (per-user, no admin needed) or portable `-win-x64.zip`
 
 > [!WARNING]
-> Builds are currently unsigned (no Apple Developer certificate yet). On first launch, right-click the app → **Open**, or clear the quarantine flag: `xattr -cr /Applications/Bivor.app`.
+> Builds are currently unsigned (no code-signing certificate yet).
+> - **macOS**: on first launch, right-click the app → **Open**, or clear the quarantine flag: `xattr -cr /Applications/Bivor.app`.
+> - **Windows**: if SmartScreen appears, click **More info** → **Run anyway**.
+
+> [!NOTE]
+> On Windows the agent's `bash` tool needs a POSIX shell — install [Git for Windows](https://git-scm.com/download/win) (Git Bash), which you almost certainly already have for the git-based features.
 
 ## Developing from source
 
-Requirements: macOS (Apple Silicon or Intel), Node.js ≥ 20, [pnpm](https://pnpm.io).
+Requirements: macOS (Apple Silicon or Intel) or Windows 10+, Node.js ≥ 20, [pnpm](https://pnpm.io).
 
 ```bash
 git clone https://github.com/ryanlab/bivor.git
@@ -128,7 +137,8 @@ pnpm install
 pnpm dev          # electron-vite dev with HMR
 pnpm typecheck
 pnpm build        # build to out/
-pnpm dist:mac     # package DMG + ZIP into dist/
+pnpm dist:mac     # package DMG + ZIP into dist/ (macOS)
+pnpm dist:win     # package NSIS installer + ZIP into dist/ (Windows)
 ```
 
 ### Configuration
