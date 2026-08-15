@@ -276,6 +276,7 @@ export const zh = {
     currentProject: "当前项目: {name}",
     defaultProject: "默认项目",
     defaultProjectHint: "没有打开仓库时使用的草稿目录",
+    recent: "最近",
     searchProjects: "搜索最近项目…",
     noMatchProject: "没有匹配的项目",
     noRecentProject: "还没有最近项目",

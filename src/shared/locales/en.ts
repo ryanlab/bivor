@@ -279,6 +279,7 @@ export const en: Messages = {
     currentProject: "Current project: {name}",
     defaultProject: "Default project",
     defaultProjectHint: "Scratch folder used when no repository is open",
+    recent: "Recent",
     searchProjects: "Search recent projects…",
     noMatchProject: "No matching projects",
     noRecentProject: "No recent projects",

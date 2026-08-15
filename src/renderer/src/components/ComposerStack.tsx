@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from "react";
-import { Check, ChevronDown, Code2, Eye, Folder, FolderPlus, MessageSquare, Minus, Plus, Search, X } from "lucide-react";
+import { Check, ChevronDown, Code2, Eye, Folder, FolderPlus, MessageSquare, Minus, Plus, X } from "lucide-react";
 import { RUNTIME_PRESETS } from "@shared/runtime-presets";
 import { useAppStore } from "@/stores/app-store";
 import { basename, projectName, samePath, shortenPath } from "@/lib/format";
+import { useDismiss } from "@/lib/use-dismiss";
 import { useT } from "@/lib/i18n";
 import { cn } from "@/lib/cn";
 
@@ -22,15 +23,7 @@ export function PresetSwitch(): React.JSX.Element {
   const CurrentIcon = PRESET_META[current.id]?.icon ?? Code2;
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (!open) return;
-    const onClick = (e: MouseEvent): void => {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
-    };
-    window.addEventListener("mousedown", onClick);
-    return () => window.removeEventListener("mousedown", onClick);
-  }, [open]);
+  useDismiss(open, ref, () => setOpen(false));
 
   return (
     <div ref={ref} className="relative">
@@ -90,6 +83,7 @@ export function ProjectListItem({
   onSelect,
   onRemove,
   leading,
+  compact,
   className,
 }: {
   name: string;
@@ -98,29 +92,53 @@ export function ProjectListItem({
   onSelect: () => void;
   onRemove?: () => void;
   leading?: React.ReactNode;
+  /** Match ModelPicker row density (search dropdown). */
+  compact?: boolean;
   className?: string;
 }): React.JSX.Element {
   const t = useT();
   return (
-    <div className={cn("flex items-center gap-1", className)}>
+    <div
+      className={cn(
+        "group flex w-full items-center gap-2",
+        compact && "rounded-md px-2 text-xs transition-colors hover:bg-bg-hover",
+        compact && (selected ? "text-accent" : "text-fg-secondary"),
+        className,
+      )}
+    >
       <button
         type="button"
         onClick={onSelect}
-        className="flex min-w-0 flex-1 items-center gap-2 px-2.5 py-2 text-left"
+        className={cn(
+          "flex min-w-0 flex-1 items-center text-left",
+          compact ? "gap-1.5 py-1.5" : "gap-2 px-2.5 py-2",
+        )}
       >
         {leading}
         <div className="min-w-0 flex-1">
-          <div className="truncate text-[13px]">{name}</div>
-          <div className="truncate text-[11px] text-fg-muted">{hint}</div>
+          <div className={cn("truncate", !compact && "text-[13px]")}>{name}</div>
+          <div
+            className={cn(
+              "truncate",
+              compact ? (selected ? "text-accent/70" : "text-fg-muted") : "text-[11px] text-fg-muted",
+            )}
+          >
+            {hint}
+          </div>
         </div>
-        {selected && <Check size={13} className="shrink-0 text-accent" />}
+        {selected && <Check size={13} className="shrink-0" />}
       </button>
       {onRemove && (
         <button
           type="button"
           title={t("composer.removeProject")}
           onClick={onRemove}
-          className="mr-1 flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-fg-muted/60 hover:bg-bg-tertiary hover:text-fg"
+          className={cn(
+            "flex shrink-0 items-center justify-center text-fg-muted",
+            compact
+              ? "h-5 w-5 rounded-md opacity-0 transition-opacity hover:text-fg group-hover:opacity-100"
+              : "mr-1 h-6 w-6 rounded-md text-fg-muted/60 hover:bg-bg-tertiary hover:text-fg",
+          )}
         >
           <X size={12} />
         </button>
@@ -153,8 +171,9 @@ export function ComposerStack({
   const setAppMode = useAppStore((s) => s.setAppMode);
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
-  const ref = useRef<HTMLDivElement>(null);
+  const pickerRef = useRef<HTMLDivElement>(null);
   const searchRef = useRef<HTMLInputElement>(null);
+  useDismiss(open, pickerRef, () => setOpen(false));
 
   useEffect(() => {
     if (!stacked) setOpen(false);
@@ -166,11 +185,6 @@ export function ComposerStack({
       return;
     }
     requestAnimationFrame(() => searchRef.current?.focus());
-    const onClick = (e: MouseEvent): void => {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
-    };
-    window.addEventListener("mousedown", onClick);
-    return () => window.removeEventListener("mousedown", onClick);
   }, [open]);
 
   const q = query.trim().toLowerCase();
@@ -199,7 +213,7 @@ export function ComposerStack({
   if (!stacked && !modeBar) return <div className={className}>{children}</div>;
 
   return (
-    <div ref={ref} className={cn("relative", className)}>
+    <div className={cn("relative", className)}>
       {modeBar && (
         <div className="relative z-0 mx-6 -mb-8 flex h-16 items-start gap-1 rounded-[20px] bg-bg-secondary px-2.5 pt-1.5">
           {MODES.map((m) => {
@@ -225,6 +239,7 @@ export function ComposerStack({
       <div className="relative z-10">{children}</div>
 
       {stacked ? (
+      <div ref={pickerRef} className="relative">
       <div
         className={cn(
           "relative z-0 mx-6 -mt-8 flex h-16 items-end gap-2 rounded-[20px] px-2.5 pb-1.5 transition-colors",
@@ -249,25 +264,22 @@ export function ComposerStack({
           </span>
         </button>
       </div>
-      ) : modeBar ? (
-        <div className="h-8" aria-hidden />
-      ) : null}
-
-      {stacked && open && (
-        <div className="dialog-in absolute left-0 right-0 top-full z-50 mt-2 overflow-hidden rounded-2xl border border-border bg-bg shadow-xl">
-          <div className="flex items-center gap-2 border-b border-border px-3 py-2">
-            <Search size={13} className="shrink-0 text-fg-muted" />
+      {open && (
+        <div className="dialog-in absolute left-0 right-0 top-full z-50 mt-2 flex max-h-96 flex-col overflow-hidden rounded-xl border border-border-strong bg-bg shadow-2xl">
+          <div className="shrink-0 px-3 py-2">
             <input
               ref={searchRef}
+              autoFocus
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder={t("composer.searchProjects")}
-              className="w-full bg-transparent text-xs text-fg outline-none placeholder:text-fg-muted"
+              className="w-full bg-transparent py-0.5 text-xs text-fg outline-none placeholder:text-fg-muted"
             />
           </div>
-          <div className="max-h-40 overflow-y-auto p-1">
+          <div className="min-h-0 flex-1 overflow-y-auto p-1">
             {defaultMatches && (
               <ProjectListItem
+                compact
                 name={defaultLabel}
                 hint={defaultProjectCwd ? shortenPath(defaultProjectCwd) : defaultHint}
                 selected={samePath(activeProjectPath, defaultProjectCwd)}
@@ -275,17 +287,22 @@ export function ComposerStack({
                   void selectDefaultProject();
                   setOpen(false);
                 }}
-                className="rounded-lg transition-colors hover:bg-bg-hover"
               />
             )}
+            {filtered.length > 0 && (
+              <div className="px-2 pb-0.5 pt-1.5 text-[11px] font-medium text-fg-muted">
+                {t("composer.recent")}
+              </div>
+            )}
             {filtered.length === 0 && !defaultMatches && (
-              <div className="px-2.5 py-3 text-center text-xs text-fg-muted">
+              <div className="px-3 py-4 text-center text-xs text-fg-muted">
                 {q ? t("composer.noMatchProject") : t("composer.noRecentProject")}
               </div>
             )}
             {filtered.map((p) => (
               <ProjectListItem
                 key={p.path}
+                compact
                 name={basename(p.path)}
                 hint={shortenPath(p.path)}
                 selected={samePath(p.path, activeProjectPath)}
@@ -294,11 +311,10 @@ export function ComposerStack({
                   setOpen(false);
                 }}
                 onRemove={() => removeRecentProject(p.path)}
-                className="rounded-lg transition-colors hover:bg-bg-hover"
               />
             ))}
           </div>
-          <div className="grid grid-cols-2 border-t border-border">
+          <div className="grid grid-cols-2 gap-0.5 p-1">
             <button
               type="button"
               onClick={() => {
@@ -307,7 +323,7 @@ export function ComposerStack({
                   if (path) openProject(path);
                 });
               }}
-              className="flex items-center justify-center gap-2 px-3 py-2.5 text-xs text-fg-secondary transition-colors hover:bg-bg-hover"
+              className="flex items-center justify-center gap-1.5 rounded-md px-2 py-1.5 text-xs text-fg-secondary transition-colors hover:bg-bg-hover"
             >
               <FolderPlus size={13} />
               {t("composer.newFolder")}
@@ -318,7 +334,7 @@ export function ComposerStack({
                 setOpen(false);
                 void pickAndOpenProject();
               }}
-              className="flex items-center justify-center gap-2 border-l border-border px-3 py-2.5 text-xs text-fg-secondary transition-colors hover:bg-bg-hover"
+              className="flex items-center justify-center gap-1.5 rounded-md px-2 py-1.5 text-xs text-fg-secondary transition-colors hover:bg-bg-hover"
             >
               <Plus size={13} />
               {t("composer.openFolder")}
@@ -326,6 +342,10 @@ export function ComposerStack({
           </div>
         </div>
       )}
+      </div>
+      ) : modeBar ? (
+        <div className="h-8" aria-hidden />
+      ) : null}
     </div>
   );
 }

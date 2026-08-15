@@ -429,7 +429,7 @@ export function ModelPicker({
         style={{ top: pos.top, left: pos.left, width: DROPDOWN_WIDTH, maxHeight: pos.maxHeight }}
         className="dialog-in fixed z-50 flex flex-col overflow-hidden rounded-xl border border-border-strong bg-bg shadow-2xl"
       >
-        <div className="shrink-0 border-b border-border px-3 py-2">
+        <div className="shrink-0 px-3 py-2">
           <input
             autoFocus
             value={filter}
@@ -564,11 +564,11 @@ export function ModelPicker({
         }}
         className="dialog-in fixed z-50 overflow-hidden rounded-xl border border-border-strong bg-bg shadow-2xl"
       >
-        <div className="border-b border-border px-3 pb-1.5 pt-2">
+        <div className="px-3 pb-1.5 pt-2">
           <div className="text-[11px] font-medium text-fg">Edit</div>
           <div className="truncate text-[10.5px] text-fg-muted">{options.model.name}</div>
         </div>
-        <div className="border-b border-border p-1">
+        <div className="p-1">
           <button
             type="button"
             onClick={() =>
