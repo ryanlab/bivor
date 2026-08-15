@@ -14,6 +14,7 @@ import type {
 } from "@shared/protocol";
 import { IPC } from "@shared/protocol";
 import { getConfig } from "./config";
+import { markAgentExiting, trackAgentProcess } from "./agent-monitor";
 import { mt } from "./i18n";
 
 interface ChatProcess {
@@ -24,10 +25,11 @@ interface ChatProcess {
 
 const chats = new Map<string, ChatProcess>();
 
-function forkHost(chatId: string, cwd: string, servicePrefix: string): UtilityProcess {
+function forkHost(chatId: string, cwd: string, servicePrefix: string, label?: string): UtilityProcess {
   const hostPath = join(import.meta.dirname, "host.js");
-  return utilityProcess.fork(hostPath, [], {
-    serviceName: `${servicePrefix}-${chatId.slice(0, 8)}`,
+  const serviceName = `${servicePrefix}-${chatId.slice(0, 8)}`;
+  const proc = utilityProcess.fork(hostPath, [], {
+    serviceName,
     cwd,
     env: {
       ...process.env,
@@ -37,6 +39,14 @@ function forkHost(chatId: string, cwd: string, servicePrefix: string): UtilityPr
       ...(getConfig().vercelTeamId ? { VERCEL_TEAM_ID: getConfig().vercelTeamId } : {}),
     },
   });
+  trackAgentProcess(proc, {
+    chatId,
+    kind: servicePrefix === "pi-task" ? "headless" : "chat",
+    cwd,
+    serviceName,
+    label,
+  });
+  return proc;
 }
 
 export function createChat(webContents: WebContents, options: ChatCreateOptions): string {
@@ -100,6 +110,7 @@ export function sendChatCommand(chatId: string, command: HostCommand): void {
 
 /** Ask the host to clean up (destroy its VM) then exit; force-kill as backstop. */
 function gracefulKill(proc: UtilityProcess): Promise<void> {
+  markAgentExiting(proc);
   return new Promise((resolve) => {
     let done = false;
     const finish = (): void => {
@@ -155,6 +166,8 @@ const headlessProcs = new Set<UtilityProcess>();
 export interface HeadlessRunOptions {
   cwd: string;
   prompt: string;
+  /** 展示名（定时任务名），用于运行状况监控 */
+  label?: string;
   kind?: ChatKind;
   presetId?: string;
   model?: { provider: string; modelId: string };
@@ -175,7 +188,7 @@ export interface HeadlessRunResult {
  */
 export function runHeadlessPrompt(options: HeadlessRunOptions): Promise<HeadlessRunResult> {
   const chatId = randomUUID();
-  const proc = forkHost(chatId, options.cwd, "pi-task");
+  const proc = forkHost(chatId, options.cwd, "pi-task", options.label);
   headlessProcs.add(proc);
 
   return new Promise<HeadlessRunResult>((resolve) => {

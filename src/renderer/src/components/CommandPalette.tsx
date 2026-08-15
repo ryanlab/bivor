@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
+  Activity,
   AlarmClock,
   BarChart3,
   FileDown,
@@ -156,6 +157,17 @@ export function CommandPalette(): React.JSX.Element | null {
         run: () => {
           close();
           s.setUsageOpen(true);
+        },
+      },
+      {
+        id: "agent-monitor",
+        icon: <Activity size={14} />,
+        label: t("palette.monitor"),
+        hint: "⌘⇧M",
+        keywords: "monitor status agent process cpu memory yunxing zhuangkuang jincheng",
+        run: () => {
+          close();
+          s.setMonitorOpen(true);
         },
       },
       {

@@ -9,9 +9,11 @@ import { SettingsDialog } from "@/components/SettingsDialog";
 import { CommandPalette } from "@/components/CommandPalette";
 import { ResourcesDialog } from "@/components/ResourcesDialog";
 import { UsageDialog } from "@/components/UsageDialog";
+import { AgentMonitorDialog } from "@/components/AgentMonitorDialog";
 import { ScheduledTasksDialog } from "@/components/ScheduledTasksDialog";
 import { DeploymentsPanel } from "@/components/DeploymentsPanel";
 import { ShortcutsOverlay } from "@/components/ShortcutsOverlay";
+import { tt } from "@/lib/i18n";
 
 export default function App(): React.JSX.Element {
   const activeChatId = useAppStore((s) => s.activeChatId);
@@ -34,6 +36,16 @@ export default function App(): React.JSX.Element {
     });
     const unsubScheduleTrigger = window.pi.schedule.onTrigger((task) => {
       useAppStore.getState().handleScheduleTrigger(task);
+    });
+    const unsubAgentCrash = window.pi.monitor.onAgentCrash((payload) => {
+      if (Notification.permission === "denied") return;
+      const name =
+        payload.label ??
+        useAppStore.getState().chats[payload.chatId]?.sessionName ??
+        (payload.kind === "headless" ? tt("monitor.headlessTask") : payload.serviceName);
+      new Notification(tt("notify.agentCrashTitle"), {
+        body: tt("notify.agentCrashBody", { name, code: payload.code }),
+      });
     });
     const unsubMenu = window.pi.system.onMenuAction((action) => {
       const s = useAppStore.getState();
@@ -70,6 +82,9 @@ export default function App(): React.JSX.Element {
       } else if (e.key === "/") {
         e.preventDefault();
         s.setShortcutsOpen(!s.shortcutsOpen);
+      } else if (e.key.toLowerCase() === "m" && e.shiftKey) {
+        e.preventDefault();
+        s.setMonitorOpen(!s.monitorOpen);
       }
     };
     window.addEventListener("keydown", onKeyDown);
@@ -77,6 +92,7 @@ export default function App(): React.JSX.Element {
       unsubscribe();
       unsubScheduleChanged();
       unsubScheduleTrigger();
+      unsubAgentCrash();
       unsubMenu();
       window.removeEventListener("keydown", onKeyDown);
     };
@@ -107,6 +123,7 @@ export default function App(): React.JSX.Element {
       <SettingsDialog />
       <ResourcesDialog />
       <UsageDialog />
+      <AgentMonitorDialog />
       <ScheduledTasksDialog />
       <DeploymentsPanel />
       {shortcutsOpen && <ShortcutsOverlay onClose={() => setShortcutsOpen(false)} />}

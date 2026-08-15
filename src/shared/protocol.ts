@@ -372,6 +372,62 @@ export interface ScheduledTask {
   lastRun?: ScheduledTaskRunResult;
 }
 
+// ---------- Agent 运行状况监控 ----------
+
+/** 一个正在运行的 agent 宿主进程（utilityProcess）的进程级信息 */
+export interface AgentProcessInfo {
+  chatId: string;
+  /** chat = 窗口内会话；headless = 定时任务的无头执行 */
+  kind: "chat" | "headless";
+  cwd: string;
+  serviceName: string;
+  /** 无头任务的名称（来自定时任务） */
+  label?: string;
+  startedAt: number;
+  pid?: number;
+  /** 该进程的 CPU 占用百分比（来自 app.getAppMetrics） */
+  cpuPercent?: number;
+  /** 常驻内存（bytes） */
+  memoryBytes?: number;
+  /** 最近的 CPU 采样（旧→新，最多 30 个点；面板打开轮询期间累积） */
+  cpuHistory: number[];
+  /** 最近的内存采样（bytes，旧→新，最多 30 个点） */
+  memoryHistory: number[];
+  /** 已收到关闭指令、正在优雅退出（清理云 VM 等，最多几秒后消失） */
+  exiting?: boolean;
+}
+
+/** Bivor 应用自身（主进程 + 渲染 + GPU 等，不含 agent 宿主进程）的聚合开销 */
+export interface AppSelfInfo {
+  /** 主进程 pid */
+  pid: number;
+  /** 主进程启动时间（epoch ms） */
+  startedAt?: number;
+  cpuPercent: number;
+  memoryBytes: number;
+  cpuHistory: number[];
+  memoryHistory: number[];
+}
+
+export interface AgentMonitorSnapshot {
+  /** 内嵌 pi SDK（@earendil-works/pi-coding-agent）的版本 */
+  piVersion: string;
+  /** Bivor 应用版本 */
+  appVersion: string;
+  self: AppSelfInfo;
+  processes: AgentProcessInfo[];
+}
+
+/** agent 宿主进程在未收到关闭指令的情况下退出（崩溃 / 被系统杀掉） */
+export interface AgentCrashPayload {
+  chatId: string;
+  kind: "chat" | "headless";
+  label?: string;
+  serviceName: string;
+  /** 进程退出码 */
+  code: number;
+}
+
 // ---------- 云端沙箱 VM ----------
 
 export interface SandboxStatusPayload {
@@ -743,6 +799,10 @@ export const IPC = {
   deploymentsRedeploy: "deployments:redeploy",
   deploymentsPromote: "deployments:promote",
   deploymentsRollback: "deployments:rollback",
+  // agent 运行状况监控
+  monitorSnapshot: "monitor:snapshot",
+  monitorKill: "monitor:kill",
+  monitorAgentCrash: "monitor:agentCrash",
   // scheduled tasks
   scheduleList: "schedule:list",
   scheduleSave: "schedule:save",

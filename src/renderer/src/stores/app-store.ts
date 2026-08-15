@@ -56,6 +56,10 @@ export interface ChatState {
   model?: ModelInfo;
   thinkingLevel: ThinkingLevel;
   isStreaming: boolean;
+  /** 当前这一轮 prompt 的开始时间；用于监控面板的"长时间运行"提示 */
+  streamingSince?: number;
+  /** 最近一次收到该会话事件的时间；streaming 中长时间无事件 → 监控面板提示疑似无响应 */
+  lastEventAt?: number;
   messages: PiMessage[];
   streaming?: AssistantMessage;
   toolRuns: Record<string, ToolRun>;
@@ -101,6 +105,8 @@ export interface ChatState {
   trajectory?: TrajectoryStepPayload[];
   /** undefined = 沙箱不可用（无 API key），否则为当前状态 */
   sandbox?: SandboxStatusPayload;
+  /** 沙箱进入 running 的时间；用于监控面板显示计费时长 */
+  sandboxSince?: number;
   sandboxOpen: boolean;
   /** 执行世界：bash/read/write/edit 的后端（本机 / 云端 VM） */
   executionWorld?: "local" | "vm";
@@ -159,6 +165,7 @@ interface AppState {
   /** Which resources tab to show when the dialog opens. */
   resourcesTab?: string;
   usageOpen: boolean;
+  monitorOpen: boolean;
   shortcutsOpen: boolean;
   deploymentsOpen: boolean;
   // scheduled tasks
@@ -230,6 +237,7 @@ interface AppState {
   setPaletteOpen(open: boolean): void;
   setResourcesOpen(open: boolean, tab?: string): void;
   setUsageOpen(open: boolean): void;
+  setMonitorOpen(open: boolean): void;
   setShortcutsOpen(open: boolean): void;
   setDeploymentsOpen(open: boolean): void;
   requestHarness(chatId: string): void;
@@ -440,6 +448,9 @@ function fromSnapshot(chat: ChatState, snapshot: ChatStateSnapshot): ChatState {
     model: snapshot.model ?? chat.model,
     thinkingLevel: snapshot.thinkingLevel,
     isStreaming: hostBehind ? chat.isStreaming : snapshot.isStreaming,
+    streamingSince: (hostBehind ? chat.isStreaming : snapshot.isStreaming)
+      ? (chat.streamingSince ?? Date.now())
+      : undefined,
     kind: snapshot.kind ?? chat.kind,
     presetId: snapshot.presetId ?? chat.presetId,
     executionWorld: snapshot.executionWorld ?? chat.executionWorld,
@@ -472,7 +483,12 @@ function applySessionEvent(chat: ChatState, raw: unknown): ChatState {
   const event = raw as Record<string, unknown> & { type: string };
   switch (event.type) {
     case "agent_start":
-      return { ...chat, isStreaming: true, lastError: undefined };
+      return {
+        ...chat,
+        isStreaming: true,
+        streamingSince: chat.streamingSince ?? Date.now(),
+        lastError: undefined,
+      };
 
     case "agent_end": {
       // On abort, in-progress tools may never get a tool_execution_end; settle
@@ -489,7 +505,7 @@ function applySessionEvent(chat: ChatState, raw: unknown): ChatState {
           };
         }
       }
-      return { ...chat, isStreaming: false, streaming: undefined, toolRuns };
+      return { ...chat, isStreaming: false, streamingSince: undefined, streaming: undefined, toolRuns };
     }
 
     case "message_start": {
@@ -717,8 +733,15 @@ function applyHostEvent(chat: ChatState, event: HostEvent): ChatState {
       return { ...chat, harnessBusy: false, harnessError: event.message };
     case "trajectory":
       return { ...chat, trajectory: event.steps };
-    case "sandbox":
-      return { ...chat, sandbox: event.sandbox };
+    case "sandbox": {
+      const wasRunning = chat.sandbox?.status === "running";
+      const isRunning = event.sandbox.status === "running";
+      return {
+        ...chat,
+        sandbox: event.sandbox,
+        sandboxSince: isRunning ? (wasRunning ? chat.sandboxSince : Date.now()) : undefined,
+      };
+    }
     case "execution_world":
       return { ...chat, executionWorld: event.world };
     case "local_sandbox":
@@ -778,6 +801,7 @@ function applyHostEvent(chat: ChatState, event: HostEvent): ChatState {
         messages,
         lastError: event.message,
         isStreaming: false,
+        streamingSince: undefined,
         streaming: undefined,
         toolRuns,
       };
@@ -785,7 +809,13 @@ function applyHostEvent(chat: ChatState, event: HostEvent): ChatState {
     case "prompt_done":
       return chat;
     case "fatal":
-      return { ...chat, status: "error", error: event.message, isStreaming: false };
+      return {
+        ...chat,
+        status: "error",
+        error: event.message,
+        isStreaming: false,
+        streamingSince: undefined,
+      };
     default:
       return chat;
   }
@@ -812,6 +842,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   paletteOpen: false,
   resourcesOpen: false,
   usageOpen: false,
+  monitorOpen: false,
   shortcutsOpen: false,
   deploymentsOpen: false,
   scheduledTasks: [],
@@ -909,7 +940,8 @@ export const useAppStore = create<AppState>((set, get) => ({
     const { chatId, event } = envelope;
     const chat = get().chats[chatId];
     if (!chat) return;
-    const next = applyHostEvent(chat, event);
+    // 任何 host 事件都视为该会话的存活证据（监控面板"疑似无响应"判定依据）
+    const next = { ...applyHostEvent(chat, event), lastEventAt: Date.now() };
     set((s) => ({ chats: { ...s.chats, [chatId]: next } }));
     // Remember which preset this session ran with, for future reopens.
     if (event.type === "ready" && next.sessionFile) {
@@ -1156,6 +1188,10 @@ export const useAppStore = create<AppState>((set, get) => ({
     set({ usageOpen: open });
   },
 
+  setMonitorOpen(open) {
+    set({ monitorOpen: open });
+  },
+
   setShortcutsOpen(open) {
     set({ shortcutsOpen: open });
   },
@@ -1365,6 +1401,7 @@ export const useAppStore = create<AppState>((set, get) => ({
           ...chat,
           messages: [...chat.messages, optimistic],
           isStreaming: true,
+          streamingSince: chat.streamingSince ?? Date.now(),
           lastError: undefined,
         },
       },

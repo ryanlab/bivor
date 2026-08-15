@@ -4,6 +4,7 @@ import { app, BrowserWindow, dialog, ipcMain, shell } from "electron";
 import type { ChatCreateOptions, HostCommand, ScheduledTask } from "@shared/protocol";
 import { IPC } from "@shared/protocol";
 import { createChat, disposeAllChats, disposeChat, sendChatCommand } from "./chats";
+import { getMonitorSnapshot, killAgentProcess } from "./agent-monitor";
 import {
   createTerminal,
   disposeAllTerminals,
@@ -299,6 +300,10 @@ function registerIpc(): void {
   ipcMain.on(IPC.setBadge, (_e, count: number) => {
     app.setBadgeCount(Math.max(0, Math.floor(count) || 0));
   });
+
+  // agent 运行状况监控
+  ipcMain.handle(IPC.monitorSnapshot, () => getMonitorSnapshot());
+  ipcMain.handle(IPC.monitorKill, (_e, chatId: string) => killAgentProcess(chatId));
 
   // 定时任务
   ipcMain.handle(IPC.scheduleList, () => listTasks());

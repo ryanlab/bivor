@@ -18,6 +18,7 @@ export function ShortcutsOverlay({ onClose }: { onClose: () => void }): React.JS
         [`${MOD} N`, isDaily ? t("sidebar.newChat") : t("sidebar.newTask")],
         [`${MOD} O`, isDaily ? t("sidebar.overviewChat") : t("sidebar.overviewTask")],
         [`${MOD} B`, t("shortcuts.toggleSidebar")],
+        [`${MOD} ⇧ M`, t("sidebar.monitor")],
         [`${MOD} W`, isDaily ? t("shortcuts.closeChat") : t("shortcuts.closeTask")],
         [`${MOD} ,`, t("common.settings")],
         [`${MOD} /`, t("palette.shortcuts")],

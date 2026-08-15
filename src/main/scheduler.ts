@@ -105,6 +105,7 @@ async function runBackground(task: ScheduledTask, degraded: boolean): Promise<vo
   const result = await runHeadlessPrompt({
     cwd: task.cwd,
     prompt: task.prompt,
+    label: task.name,
     kind: task.kind,
     presetId: task.presetId,
     model: task.model,

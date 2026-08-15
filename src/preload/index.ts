@@ -1,5 +1,7 @@
 import { contextBridge, ipcRenderer } from "electron";
 import type {
+  AgentCrashPayload,
+  AgentMonitorSnapshot,
   AppConfigPayload,
   AuthFlowEvent,
   ChatCreateOptions,
@@ -230,6 +232,15 @@ const api = {
         listener(termId, exitCode);
       ipcRenderer.on(IPC.termExit, handler);
       return () => ipcRenderer.removeListener(IPC.termExit, handler);
+    },
+  },
+  monitor: {
+    snapshot: (): Promise<AgentMonitorSnapshot> => ipcRenderer.invoke(IPC.monitorSnapshot),
+    kill: (chatId: string): Promise<void> => ipcRenderer.invoke(IPC.monitorKill, chatId),
+    onAgentCrash: (listener: (payload: AgentCrashPayload) => void): (() => void) => {
+      const handler = (_e: unknown, payload: AgentCrashPayload): void => listener(payload);
+      ipcRenderer.on(IPC.monitorAgentCrash, handler);
+      return () => ipcRenderer.removeListener(IPC.monitorAgentCrash, handler);
     },
   },
   system: {

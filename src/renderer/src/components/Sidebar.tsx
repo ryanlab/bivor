@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import {
+  Activity,
   AlarmClock,
   BarChart3,
   Check,
@@ -356,6 +357,14 @@ export function Sidebar(): React.JSX.Element {
         >
           <BarChart3 size={14} />
           {t("sidebar.usage")}
+        </button>
+        <button
+          type="button"
+          onClick={() => useAppStore.getState().setMonitorOpen(true)}
+          className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-xs text-fg-secondary transition-colors hover:bg-bg-hover"
+        >
+          <Activity size={14} />
+          {t("sidebar.monitor")}
         </button>
         <button
           type="button"
