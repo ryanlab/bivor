@@ -247,6 +247,7 @@ const api = {
     pickFolder: (): Promise<{ path: string | null }> => ipcRenderer.invoke(IPC.pickFolder),
     createFolder: (): Promise<{ path: string | null }> => ipcRenderer.invoke(IPC.createFolder),
     dailyCwd: (): Promise<string> => ipcRenderer.invoke(IPC.dailyCwd),
+    defaultProjectCwd: (): Promise<string> => ipcRenderer.invoke(IPC.defaultProjectCwd),
     revealPath: (path: string): void => {
       ipcRenderer.send(IPC.revealPath, path);
     },

@@ -737,6 +737,7 @@ export const IPC = {
   pickFolder: "dialog:pickFolder",
   createFolder: "dialog:createFolder",
   dailyCwd: "system:dailyCwd",
+  defaultProjectCwd: "system:defaultProjectCwd",
   configGet: "config:get",
   configSet: "config:set",
   packagesList: "resources:packagesList",

@@ -53,6 +53,17 @@ export function basename(path: string): string {
   return path.replace(/\/+$/, "").split("/").pop() ?? path;
 }
 
+export function samePath(a?: string, b?: string): boolean {
+  return Boolean(a && b && a.replace(/\/+$/, "") === b.replace(/\/+$/, ""));
+}
+
+/** Localized label for the coding workspace; the scratch folder is not shown as "Scratch". */
+export function projectName(path: string | undefined, defaultCwd?: string): string {
+  if (samePath(path, defaultCwd)) return tt("composer.defaultProject");
+  if (!path) return tt("composer.selectProject");
+  return basename(path);
+}
+
 export function shortenPath(path: string, maxLen = 40): string {
   const home = path.replace(/^\/Users\/[^/]+/, "~");
   if (home.length <= maxLen) return home;

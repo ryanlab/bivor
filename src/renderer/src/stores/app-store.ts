@@ -30,6 +30,7 @@ import type { AssistantMessage, PiMessage } from "@/lib/pi-messages";
 import { applyTheme, loadThemePreference, type ThemePreference } from "@/lib/theme";
 import { applyLocale, loadLocalePreference, type Locale } from "@/lib/locale";
 import { t as translate } from "@shared/locales";
+import { samePath } from "@/lib/format";
 
 // ---------- types ----------
 
@@ -174,6 +175,8 @@ interface AppState {
   /** Daily chat vs coding agent workspace. */
   appMode: ChatKind;
   dailyCwd?: string;
+  /** Persistent scratch folder used when no repository is selected. */
+  defaultProjectCwd?: string;
   preferredModel?: ModelInfo;
   /** 每个模型各自的思考等级，键为 `provider/modelId` */
   modelThinking: Record<string, ThinkingLevel>;
@@ -190,7 +193,9 @@ interface AppState {
   newChat(options?: { initialPrompt?: string }): Promise<void>;
   handleEnvelope(envelope: HostEventEnvelope): void;
   openProject(path: string): void;
+  removeRecentProject(path: string): void;
   pickAndOpenProject(): Promise<void>;
+  selectDefaultProject(): Promise<void>;
   refreshSessions(): Promise<void>;
   openChat(options: {
     cwd: string;
@@ -414,6 +419,23 @@ function loadProjects(): Project[] {
 
 function saveProjects(projects: Project[]): void {
   localStorage.setItem(PROJECTS_KEY, JSON.stringify(projects));
+}
+
+function excludeDefault(projects: Project[], defaultCwd?: string): Project[] {
+  return defaultCwd ? projects.filter((p) => !samePath(p.path, defaultCwd)) : projects;
+}
+
+async function resolveDefaultCwd(
+  get: () => AppState,
+  set: (partial: Partial<AppState>) => void,
+): Promise<string> {
+  const existing = get().defaultProjectCwd;
+  if (existing) return existing;
+  const cwd = await window.pi.system.defaultProjectCwd();
+  const recentProjects = excludeDefault(get().recentProjects, cwd);
+  if (recentProjects.length !== get().recentProjects.length) saveProjects(recentProjects);
+  set({ defaultProjectCwd: cwd, recentProjects });
+  return cwd;
 }
 
 function fromSnapshot(chat: ChatState, snapshot: ChatStateSnapshot): ChatState {
@@ -849,6 +871,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   scheduledTasksOpen: false,
   appMode: loadAppMode(),
   dailyCwd: undefined,
+  defaultProjectCwd: undefined,
   preferredModel: loadPreferredModel(),
   modelThinking: loadModelThinking(),
   codingPresetId: loadCodingPreset(),
@@ -924,12 +947,11 @@ export const useAppStore = create<AppState>((set, get) => ({
       await get().openChat({ cwd, kind: "daily", initialPrompt: options?.initialPrompt });
       return;
     }
-    if (!s.activeProjectPath) {
-      await get().pickAndOpenProject();
-      return;
-    }
+    if (!s.activeProjectPath) await get().selectDefaultProject();
+    const cwd = get().activeProjectPath;
+    if (!cwd) return;
     await get().openChat({
-      cwd: s.activeProjectPath,
+      cwd,
       kind: "coding",
       presetId: s.codingPresetId,
       initialPrompt: options?.initialPrompt,
@@ -1005,21 +1027,40 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   openProject(path) {
+    if (samePath(path, get().defaultProjectCwd)) {
+      void get().selectDefaultProject();
+      return;
+    }
     const projects = [
       { path, lastOpenedAt: Date.now() },
-      ...get().recentProjects.filter((p) => p.path !== path),
+      ...excludeDefault(get().recentProjects, get().defaultProjectCwd).filter((p) => !samePath(p.path, path)),
     ].slice(0, 20);
     saveProjects(projects);
     set({ recentProjects: projects, activeProjectPath: path, activeProjectIsGit: false });
     void get().refreshSessions();
     void window.pi.worktrees.isGitRepo(path).then((isGit) => {
-      if (get().activeProjectPath === path) set({ activeProjectIsGit: isGit });
+      if (samePath(get().activeProjectPath, path)) set({ activeProjectIsGit: isGit });
     });
+  },
+
+  removeRecentProject(path) {
+    if (samePath(path, get().defaultProjectCwd)) return;
+    const projects = get().recentProjects.filter((p) => !samePath(p.path, path));
+    saveProjects(projects);
+    set({ recentProjects: projects });
+    if (samePath(get().activeProjectPath, path)) void get().selectDefaultProject();
   },
 
   async pickAndOpenProject() {
     const { path } = await window.pi.system.pickFolder();
     if (path) get().openProject(path);
+  },
+
+  async selectDefaultProject() {
+    const cwd = await resolveDefaultCwd(get, set);
+    if (samePath(get().activeProjectPath, cwd)) return;
+    set({ activeProjectPath: cwd, activeProjectIsGit: false });
+    void get().refreshSessions();
   },
 
   async refreshSessions() {
@@ -1608,11 +1649,12 @@ export const useAppStore = create<AppState>((set, get) => ({
       });
     }
     try {
-      const [models, providers, config, dailyCwd] = await Promise.all([
+      const [models, providers, config, dailyCwd, defaultProjectCwd] = await Promise.all([
         window.pi.models.list(),
         window.pi.providers.list(),
         window.pi.config.get(),
         window.pi.system.dailyCwd(),
+        window.pi.system.defaultProjectCwd(),
       ]);
       const appMode =
         config.appMode === "daily" || config.appMode === "coding" ? config.appMode : get().appMode;
@@ -1621,7 +1663,17 @@ export const useAppStore = create<AppState>((set, get) => ({
       } catch {
         // ignore
       }
-      set({ models, providers, dailyCwd, appMode });
+      const recentProjects = excludeDefault(get().recentProjects, defaultProjectCwd);
+      if (recentProjects.length !== get().recentProjects.length) saveProjects(recentProjects);
+      set({
+        models,
+        providers,
+        dailyCwd,
+        defaultProjectCwd,
+        appMode,
+        recentProjects,
+        ...(!get().activeProjectPath ? { activeProjectPath: defaultProjectCwd, activeProjectIsGit: false } : {}),
+      });
       const authed = new Set(providers.filter((p) => p.authenticated).map((p) => p.id));
       const current = get().preferredModel;
       if (!current || !authed.has(current.provider)) {

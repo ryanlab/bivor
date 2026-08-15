@@ -22,7 +22,7 @@ import {
   X,
 } from "lucide-react";
 import { useAppStore } from "@/stores/app-store";
-import { basename, formatRelativeTime } from "@/lib/format";
+import { formatRelativeTime, projectName } from "@/lib/format";
 import { cn } from "@/lib/cn";
 import { useT } from "@/lib/i18n";
 
@@ -52,6 +52,8 @@ export function CommandPalette(): React.JSX.Element | null {
   const sessionList = useAppStore((s) => s.sessions);
   const appMode = useAppStore((s) => s.appMode);
   const locale = useAppStore((s) => s.locale);
+  const activeProjectPath = useAppStore((s) => s.activeProjectPath);
+  const defaultProjectCwd = useAppStore((s) => s.defaultProjectCwd);
 
   const items = useMemo<Item[]>(() => {
     const s = useAppStore.getState();
@@ -377,7 +379,7 @@ export function CommandPalette(): React.JSX.Element | null {
           ))}
         </div>
         <div className="px-4 pb-3 pt-1 text-[11px] text-fg-muted">
-          {basename(useAppStore.getState().activeProjectPath ?? "") || t("palette.noProject")}
+          {projectName(activeProjectPath, defaultProjectCwd)}
         </div>
       </div>
     </div>

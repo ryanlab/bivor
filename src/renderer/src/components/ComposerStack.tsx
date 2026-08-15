@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from "react";
-import { Check, ChevronDown, Code2, Eye, Folder, FolderPlus, MessageSquare, Minus, Plus, Search } from "lucide-react";
+import { Check, ChevronDown, Code2, Eye, Folder, FolderPlus, MessageSquare, Minus, Plus, Search, X } from "lucide-react";
 import { RUNTIME_PRESETS } from "@shared/runtime-presets";
 import { useAppStore } from "@/stores/app-store";
-import { basename, shortenPath } from "@/lib/format";
+import { basename, projectName, samePath, shortenPath } from "@/lib/format";
 import { useT } from "@/lib/i18n";
 import { cn } from "@/lib/cn";
 
@@ -83,6 +83,52 @@ const MODES = [
   { id: "coding" as const, label: "welcome.codingMode", hint: "preset.codingHint", icon: Code2 },
 ];
 
+export function ProjectListItem({
+  name,
+  hint,
+  selected,
+  onSelect,
+  onRemove,
+  leading,
+  className,
+}: {
+  name: string;
+  hint: string;
+  selected?: boolean;
+  onSelect: () => void;
+  onRemove?: () => void;
+  leading?: React.ReactNode;
+  className?: string;
+}): React.JSX.Element {
+  const t = useT();
+  return (
+    <div className={cn("flex items-center gap-1", className)}>
+      <button
+        type="button"
+        onClick={onSelect}
+        className="flex min-w-0 flex-1 items-center gap-2 px-2.5 py-2 text-left"
+      >
+        {leading}
+        <div className="min-w-0 flex-1">
+          <div className="truncate text-[13px]">{name}</div>
+          <div className="truncate text-[11px] text-fg-muted">{hint}</div>
+        </div>
+        {selected && <Check size={13} className="shrink-0 text-accent" />}
+      </button>
+      {onRemove && (
+        <button
+          type="button"
+          title={t("composer.removeProject")}
+          onClick={onRemove}
+          className="mr-1 flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-fg-muted/60 hover:bg-bg-tertiary hover:text-fg"
+        >
+          <X size={12} />
+        </button>
+      )}
+    </div>
+  );
+}
+
 export function ComposerStack({
   stacked,
   modeBar = false,
@@ -98,7 +144,10 @@ export function ComposerStack({
   const t = useT();
   const recentProjects = useAppStore((s) => s.recentProjects);
   const activeProjectPath = useAppStore((s) => s.activeProjectPath);
+  const defaultProjectCwd = useAppStore((s) => s.defaultProjectCwd);
   const openProject = useAppStore((s) => s.openProject);
+  const removeRecentProject = useAppStore((s) => s.removeRecentProject);
+  const selectDefaultProject = useAppStore((s) => s.selectDefaultProject);
   const pickAndOpenProject = useAppStore((s) => s.pickAndOpenProject);
   const appMode = useAppStore((s) => s.appMode);
   const setAppMode = useAppStore((s) => s.setAppMode);
@@ -125,14 +174,27 @@ export function ComposerStack({
   }, [open]);
 
   const q = query.trim().toLowerCase();
+  const recents = recentProjects.filter((p) => !samePath(p.path, defaultProjectCwd));
+  const defaultLabel = t("composer.defaultProject");
+  const defaultHint = t("composer.defaultProjectHint");
+  const defaultMatches =
+    !q ||
+    defaultLabel.toLowerCase().includes(q) ||
+    defaultHint.toLowerCase().includes(q) ||
+    (defaultProjectCwd
+      ? defaultProjectCwd.toLowerCase().includes(q) ||
+        shortenPath(defaultProjectCwd).toLowerCase().includes(q)
+      : false);
   const filtered = q
-    ? recentProjects.filter(
-        (p) =>
-          basename(p.path).toLowerCase().includes(q) ||
-          shortenPath(p.path).toLowerCase().includes(q) ||
-          p.path.toLowerCase().includes(q),
-      )
-    : recentProjects;
+    ? recents.filter((p) => {
+        const name = basename(p.path).toLowerCase();
+        return (
+          name.includes(q) ||
+          p.path.toLowerCase().includes(q) ||
+          shortenPath(p.path).toLowerCase().includes(q)
+        );
+      })
+    : recents;
 
   if (!stacked && !modeBar) return <div className={className}>{children}</div>;
 
@@ -179,8 +241,10 @@ export function ComposerStack({
         >
           <Folder size={15} strokeWidth={1.7} className="shrink-0" />
           <span className="min-w-0 truncate">
-            {activeProjectPath
-              ? t("composer.currentProject", { name: basename(activeProjectPath) })
+            {activeProjectPath || defaultProjectCwd
+              ? t("composer.currentProject", {
+                  name: projectName(activeProjectPath ?? defaultProjectCwd, defaultProjectCwd),
+                })
               : t("composer.selectProject")}
           </span>
         </button>
@@ -202,27 +266,36 @@ export function ComposerStack({
             />
           </div>
           <div className="max-h-40 overflow-y-auto p-1">
-            {filtered.length === 0 && (
+            {defaultMatches && (
+              <ProjectListItem
+                name={defaultLabel}
+                hint={defaultProjectCwd ? shortenPath(defaultProjectCwd) : defaultHint}
+                selected={samePath(activeProjectPath, defaultProjectCwd)}
+                onSelect={() => {
+                  void selectDefaultProject();
+                  setOpen(false);
+                }}
+                className="rounded-lg transition-colors hover:bg-bg-hover"
+              />
+            )}
+            {filtered.length === 0 && !defaultMatches && (
               <div className="px-2.5 py-3 text-center text-xs text-fg-muted">
                 {q ? t("composer.noMatchProject") : t("composer.noRecentProject")}
               </div>
             )}
             {filtered.map((p) => (
-              <button
+              <ProjectListItem
                 key={p.path}
-                type="button"
-                onClick={() => {
+                name={basename(p.path)}
+                hint={shortenPath(p.path)}
+                selected={samePath(p.path, activeProjectPath)}
+                onSelect={() => {
                   openProject(p.path);
                   setOpen(false);
                 }}
-                className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left transition-colors hover:bg-bg-hover"
-              >
-                <div className="min-w-0 flex-1">
-                  <div className="truncate text-[13px]">{basename(p.path)}</div>
-                  <div className="truncate text-[11px] text-fg-muted">{shortenPath(p.path)}</div>
-                </div>
-                {p.path === activeProjectPath && <Check size={13} className="text-accent" />}
-              </button>
+                onRemove={() => removeRecentProject(p.path)}
+                className="rounded-lg transition-colors hover:bg-bg-hover"
+              />
             ))}
           </div>
           <div className="grid grid-cols-2 border-t border-border">

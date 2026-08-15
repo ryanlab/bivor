@@ -300,6 +300,11 @@ function registerIpc(): void {
     mkdirSync(dir, { recursive: true });
     return dir;
   });
+  ipcMain.handle(IPC.defaultProjectCwd, () => {
+    const dir = join(app.getPath("documents"), "Bivor", "Scratch");
+    mkdirSync(dir, { recursive: true });
+    return dir;
+  });
 
   ipcMain.on(IPC.revealPath, (_e, path: string) => {
     shell.showItemInFolder(path);
