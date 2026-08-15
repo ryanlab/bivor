@@ -372,6 +372,8 @@ export const zh = {
     expandSidebar: "展开侧栏 ({mod}B)",
     collapseSidebar: "收起侧栏 ({mod}B)",
     search: "搜索 ({mod}K)",
+    newChat: "新对话 ({mod}N)",
+    newTask: "新任务 ({mod}N)",
   },
   approval: {
     request: "agent 请求调用",

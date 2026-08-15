@@ -1,8 +1,10 @@
 import { mkdirSync } from "node:fs";
+import { release } from "node:os";
 import { join } from "node:path";
 import { app, BrowserWindow, dialog, ipcMain, shell } from "electron";
 import type { ChatCreateOptions, HostCommand, ScheduledTask } from "@shared/protocol";
 import { IPC } from "@shared/protocol";
+import { TITLEBAR_HEIGHT } from "@shared/titlebar";
 import { createChat, disposeAllChats, disposeChat, sendChatCommand } from "./chats";
 import { getMonitorSnapshot, killAgentProcess } from "./agent-monitor";
 import {
@@ -88,6 +90,13 @@ import {
 
 const isDev = !app.isPackaged;
 
+/** Center native traffic lights in TITLEBAR_HEIGHT. Button is 14px on macOS 26, 16px earlier. */
+function trafficLightPosition(): { x: number; y: number } {
+  const major = Number(release().split(".")[0] ?? 0);
+  const size = major >= 25 ? 14 : 16;
+  return { x: 16, y: Math.round((TITLEBAR_HEIGHT - size) / 2) };
+}
+
 function createWindow(): BrowserWindow {
   const win = new BrowserWindow({
     width: 1440,
@@ -96,7 +105,7 @@ function createWindow(): BrowserWindow {
     minHeight: 600,
     show: false,
     titleBarStyle: "hiddenInset",
-    trafficLightPosition: { x: 16, y: 14 },
+    trafficLightPosition: trafficLightPosition(),
     backgroundColor: "#0d0d0f",
     webPreferences: {
       preload: join(import.meta.dirname, "../preload/index.mjs"),

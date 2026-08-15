@@ -375,6 +375,8 @@ export const en: Messages = {
     expandSidebar: "Expand sidebar ({mod}B)",
     collapseSidebar: "Collapse sidebar ({mod}B)",
     search: "Search ({mod}K)",
+    newChat: "New chat ({mod}N)",
+    newTask: "New task ({mod}N)",
   },
   approval: {
     request: "The agent wants to call",

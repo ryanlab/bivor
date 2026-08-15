@@ -27,7 +27,7 @@ import { Composer } from "@/components/Composer";
 import { ChangesPanel, collectChanges } from "@/components/ChangesPanel";
 import { WorktreeMergePanel } from "@/components/WorktreeMergePanel";
 import { TreePanel } from "@/components/TreePanel";
-import { WindowChrome, CollapsedTitlebar } from "@/components/WindowChrome";
+import { Titlebar, WindowChrome, CollapsedTitlebar } from "@/components/WindowChrome";
 import { cn } from "@/lib/cn";
 import { Switch } from "@/components/Switch";
 import { ShieldQuestion } from "lucide-react";
@@ -463,9 +463,9 @@ export function ChatView({ chat }: { chat: ChatState }): React.JSX.Element {
       <div className="flex min-h-0 min-w-0 flex-1 overflow-hidden">
       <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
       {/* Header */}
-      <div className="drag-region flex h-12 shrink-0 items-center gap-2 pr-4">
+      <Titlebar className="gap-2 pr-4">
         {sidebarCollapsed && <WindowChrome trafficLights />}
-        <div className={cn("min-w-0 flex-1", sidebarCollapsed ? "pl-2" : "pl-5")}>
+        <div className={cn("min-w-0 flex-1", sidebarCollapsed ? "pl-1" : "pl-5")}>
           <div className="flex items-baseline gap-2">
             <span className="truncate text-sm font-medium">{title}</span>
             {preset.id !== "coding" && preset.id !== "daily" && (
@@ -577,7 +577,7 @@ export function ChatView({ chat }: { chat: ChatState }): React.JSX.Element {
             <FileJson size={14} />
           </button>
         )}
-      </div>
+      </Titlebar>
 
       <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden">
           {searchOpen && (

@@ -1,7 +1,7 @@
 import { useEffect } from "react";
 import { useAppStore } from "@/stores/app-store";
 import { Sidebar } from "@/components/Sidebar";
-import { WindowChrome } from "@/components/WindowChrome";
+import { CollapsedTitlebar } from "@/components/WindowChrome";
 import { ChatView } from "@/components/ChatView";
 import { MissionControl } from "@/components/MissionControl";
 import { WelcomeScreen } from "@/components/WelcomeScreen";
@@ -107,11 +107,7 @@ export default function App(): React.JSX.Element {
     <div className="flex h-full">
       {!sidebarCollapsed && <Sidebar />}
       <main className="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
-        {!activeChat && sidebarCollapsed && (
-          <div className="drag-region flex h-12 shrink-0 items-center gap-0.5">
-            <WindowChrome trafficLights align="end" />
-          </div>
-        )}
+        {!activeChat && <CollapsedTitlebar />}
         {activeChat ? (
           <ChatView chat={activeChat} />
         ) : activeView === "welcome" ? (

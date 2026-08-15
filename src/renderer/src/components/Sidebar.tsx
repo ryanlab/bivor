@@ -19,7 +19,7 @@ import {
 } from "lucide-react";
 import type { SessionListItem } from "@shared/protocol";
 import { useAppStore } from "@/stores/app-store";
-import { WindowChrome } from "@/components/WindowChrome";
+import { Titlebar, WindowChrome } from "@/components/WindowChrome";
 import { formatRelativeTime } from "@/lib/format";
 import { cn } from "@/lib/cn";
 import { useT } from "@/lib/i18n";
@@ -181,9 +181,9 @@ export function Sidebar(): React.JSX.Element {
 
   return (
     <aside className="flex w-[272px] shrink-0 flex-col bg-bg-secondary">
-      <div className="drag-region flex h-12 shrink-0 items-center gap-0.5">
-        <WindowChrome trafficLights align="end" />
-      </div>
+      <Titlebar>
+        <WindowChrome trafficLights />
+      </Titlebar>
 
       <div className="flex items-center gap-0.5 px-2 pt-1">
         <button
