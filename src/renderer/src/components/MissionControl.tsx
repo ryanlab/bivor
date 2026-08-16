@@ -330,7 +330,7 @@ export function MissionControl(): React.JSX.Element {
   const totalCost = list.reduce((n, c) => n + usage(c).cost, 0);
 
   return (
-    <div className="flex-1 overflow-y-auto">
+    <div className="min-h-0 flex-1 overflow-y-auto">
       <div className="mx-auto max-w-4xl px-8 pb-10">
         <div className="flex items-end justify-between pb-5 pt-2">
           <div>

@@ -73,6 +73,8 @@ export interface ChatState {
   draft?: string;
   tree?: SessionTreeNode[];
   treeOpen: boolean;
+  /** 项目文件树面板 */
+  filesOpen: boolean;
   /** set when this chat runs in an isolated git worktree */
   worktree?: { branch: string; projectPath: string };
   /** live output of a user-initiated bash command (`!cmd`) */
@@ -119,6 +121,8 @@ export interface ChatState {
   localSandbox?: LocalSandboxMode;
   /** 用户交互终端（main 进程 PTY）的 id 列表，可开多个 */
   userTerms?: string[];
+  /** 某个终端 tab 的启动目录（未设则用会话 cwd） */
+  termCwds?: Record<string, string>;
   /** 底部终端抽屉当前 tab："agent" 或某个 userTerm id */
   localTab?: string;
   /** 底部终端抽屉是否展开 */
@@ -138,6 +142,23 @@ export interface ChatState {
 export interface Project {
   path: string;
   lastOpenedAt: number;
+}
+
+/** 欢迎页 / 总览上的项目终端（尚无会话时也能开 shell） */
+export const WORKSPACE_TERM_ID = "__workspace__";
+
+export interface WorkspaceTermState {
+  open: boolean;
+  userTerms: string[];
+  localTab?: string;
+  termCwds?: Record<string, string>;
+}
+
+const EMPTY_WORKSPACE_TERM: WorkspaceTermState = { open: false, userTerms: [] };
+
+function resetWorkspaceTerm(userTerms: string[]): WorkspaceTermState {
+  for (const id of userTerms) window.pi.term.dispose(id);
+  return EMPTY_WORKSPACE_TERM;
 }
 
 interface AppState {
@@ -182,6 +203,15 @@ interface AppState {
   modelThinking: Record<string, ThinkingLevel>;
   /** 编程模式下新会话使用的运行时 preset（coding / review / minimal） */
   codingPresetId: string;
+  /** 未进入会话时的项目终端（与 chat 终端相互独立） */
+  workspaceTerm: WorkspaceTermState;
+  /** 欢迎页云端 VM 面板是否展开 */
+  workspaceSandboxOpen: boolean;
+  /** 欢迎页云端 VM 状态；undefined = 未配置 E2B key */
+  workspaceSandbox?: SandboxStatusPayload;
+  e2bConfigured: boolean;
+  /** 欢迎页项目文件树是否展开 */
+  workspaceFilesOpen: boolean;
 
   // actions
   setTheme(pref: ThemePreference): void;
@@ -224,6 +254,8 @@ interface AppState {
   abortRetry(chatId: string): void;
   requestTree(chatId: string): void;
   setTreeOpen(chatId: string, open: boolean): void;
+  setFilesOpen(chatId: string, open: boolean): void;
+  setWorkspaceFilesOpen(open: boolean): void;
   fork(chatId: string, entryId: string, summarize?: boolean): void;
   /** Branch at the Nth user message and prefill its text for re-editing. */
   forkAtUserMessage(chatId: string, userIndex: number): void;
@@ -254,6 +286,10 @@ interface AppState {
   setSandboxOpen(chatId: string, open: boolean): void;
   /** 底部终端抽屉的开合 */
   setTermOpen(chatId: string, open: boolean): void;
+  setWorkspaceSandboxOpen(open: boolean): void;
+  setWorkspaceSandboxStatus(status: SandboxStatusPayload | undefined, configured?: boolean): void;
+  createWorkspaceSandbox(): void;
+  destroyWorkspaceSandbox(): void;
   requestGuardrails(chatId: string): void;
   applyGuardrails(chatId: string, guardrails: HarnessGuardrails): void;
   respondApproval(chatId: string, id: string, approved: boolean): void;
@@ -270,8 +306,8 @@ interface AppState {
   clearLocalTerm(chatId: string): void;
   /** 设置本机命令沙箱模式（macOS seatbelt） */
   setLocalSandbox(chatId: string, mode: LocalSandboxMode): void;
-  /** 新建一个用户交互终端 tab，返回其 id */
-  addUserTerminal(chatId: string): void;
+  /** 新建一个用户交互终端 tab；cwd 可覆盖启动目录 */
+  addUserTerminal(chatId: string, cwd?: string): void;
   /** 抽屉首次打开时确保至少有一个终端；幂等（StrictMode 双跑安全） */
   ensureUserTerminal(chatId: string): void;
   /** 关闭一个用户终端 tab（同时销毁 main 进程的 PTY） */
@@ -875,6 +911,11 @@ export const useAppStore = create<AppState>((set, get) => ({
   preferredModel: loadPreferredModel(),
   modelThinking: loadModelThinking(),
   codingPresetId: loadCodingPreset(),
+  workspaceTerm: EMPTY_WORKSPACE_TERM,
+  workspaceSandboxOpen: false,
+  workspaceSandbox: undefined,
+  e2bConfigured: false,
+  workspaceFilesOpen: false,
 
   setTheme(pref) {
     applyTheme(pref);
@@ -1036,7 +1077,13 @@ export const useAppStore = create<AppState>((set, get) => ({
       ...excludeDefault(get().recentProjects, get().defaultProjectCwd).filter((p) => !samePath(p.path, path)),
     ].slice(0, 20);
     saveProjects(projects);
-    set({ recentProjects: projects, activeProjectPath: path, activeProjectIsGit: false });
+    const same = samePath(get().activeProjectPath, path);
+    set((s) => ({
+      recentProjects: projects,
+      activeProjectPath: path,
+      activeProjectIsGit: false,
+      workspaceTerm: same ? s.workspaceTerm : resetWorkspaceTerm(s.workspaceTerm.userTerms),
+    }));
     void get().refreshSessions();
     void window.pi.worktrees.isGitRepo(path).then((isGit) => {
       if (samePath(get().activeProjectPath, path)) set({ activeProjectIsGit: isGit });
@@ -1059,7 +1106,11 @@ export const useAppStore = create<AppState>((set, get) => ({
   async selectDefaultProject() {
     const cwd = await resolveDefaultCwd(get, set);
     if (samePath(get().activeProjectPath, cwd)) return;
-    set({ activeProjectPath: cwd, activeProjectIsGit: false });
+    set((s) => ({
+      activeProjectPath: cwd,
+      activeProjectIsGit: false,
+      workspaceTerm: resetWorkspaceTerm(s.workspaceTerm.userTerms),
+    }));
     void get().refreshSessions();
   },
 
@@ -1142,6 +1193,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       compacting: false,
       pendingPrompt: initialPrompt,
       treeOpen: false,
+      filesOpen: false,
       worktree,
       bashRunning: false,
       bashOutput: "",
@@ -1153,11 +1205,18 @@ export const useAppStore = create<AppState>((set, get) => ({
       policyEvents: [],
       pendingApprovals: [],
     };
+    const runningVm =
+      get().workspaceSandbox?.status === "running" || get().workspaceSandbox?.status === "creating";
+    if (runningVm) void window.pi.workspaceSandbox.destroy();
     set((s) => ({
       chats: { ...s.chats, [chatId]: chat },
       chatOrder: [...s.chatOrder, chatId],
       activeChatId: chatId,
       activeView: "chat",
+      workspaceTerm: resetWorkspaceTerm(s.workspaceTerm.userTerms),
+      workspaceSandboxOpen: false,
+      workspaceFilesOpen: false,
+      workspaceSandbox: runningVm ? { status: "none" } : s.workspaceSandbox,
     }));
   },
 
@@ -1321,7 +1380,39 @@ export const useAppStore = create<AppState>((set, get) => ({
     if (open) window.pi.chat.command(chatId, { type: "sandbox_status" });
   },
 
+  setWorkspaceSandboxOpen(open) {
+    set({ workspaceSandboxOpen: open });
+    if (open) {
+      void window.pi.workspaceSandbox.get().then((r) => {
+        set({
+          e2bConfigured: r.configured,
+          workspaceSandbox: r.configured ? r.sandbox : undefined,
+        });
+      });
+    }
+  },
+
+  setWorkspaceSandboxStatus(status, configured) {
+    set((s) => ({
+      workspaceSandbox: status,
+      e2bConfigured: configured ?? s.e2bConfigured,
+    }));
+  },
+
+  createWorkspaceSandbox() {
+    set({ workspaceSandbox: { status: "creating" } });
+    void window.pi.workspaceSandbox.create();
+  },
+
+  destroyWorkspaceSandbox() {
+    void window.pi.workspaceSandbox.destroy();
+  },
+
   setTermOpen(chatId, open) {
+    if (chatId === WORKSPACE_TERM_ID) {
+      set((s) => ({ workspaceTerm: { ...s.workspaceTerm, open } }));
+      return;
+    }
     set((s) => {
       const chat = s.chats[chatId];
       if (!chat) return s;
@@ -1353,8 +1444,19 @@ export const useAppStore = create<AppState>((set, get) => ({
     window.pi.chat.command(chatId, { type: "set_local_sandbox", mode });
   },
 
-  addUserTerminal(chatId) {
+  addUserTerminal(chatId, cwd) {
     const termId = crypto.randomUUID();
+    if (chatId === WORKSPACE_TERM_ID) {
+      set((s) => ({
+        workspaceTerm: {
+          ...s.workspaceTerm,
+          userTerms: [...s.workspaceTerm.userTerms, termId],
+          localTab: termId,
+          termCwds: cwd ? { ...s.workspaceTerm.termCwds, [termId]: cwd } : s.workspaceTerm.termCwds,
+        },
+      }));
+      return;
+    }
     set((s) => {
       const chat = s.chats[chatId];
       if (!chat) return s;
@@ -1365,6 +1467,7 @@ export const useAppStore = create<AppState>((set, get) => ({
             ...chat,
             userTerms: [...(chat.userTerms ?? []), termId],
             localTab: termId,
+            termCwds: cwd ? { ...chat.termCwds, [termId]: cwd } : chat.termCwds,
           },
         },
       };
@@ -1372,6 +1475,11 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   ensureUserTerminal(chatId) {
+    if (chatId === WORKSPACE_TERM_ID) {
+      if (get().workspaceTerm.userTerms.length > 0) return;
+      get().addUserTerminal(chatId);
+      return;
+    }
     const chat = get().chats[chatId];
     if (!chat || (chat.userTerms ?? []).length > 0 || chat.agentTermUsed) return;
     get().addUserTerminal(chatId);
@@ -1379,17 +1487,36 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   removeUserTerminal(chatId, termId) {
     window.pi.term.dispose(termId);
+    if (chatId === WORKSPACE_TERM_ID) {
+      set((s) => {
+        const userTerms = s.workspaceTerm.userTerms.filter((id) => id !== termId);
+        const localTab =
+          s.workspaceTerm.localTab === termId
+            ? userTerms[userTerms.length - 1]
+            : s.workspaceTerm.localTab;
+        const termCwds = { ...s.workspaceTerm.termCwds };
+        delete termCwds[termId];
+        return { workspaceTerm: { ...s.workspaceTerm, userTerms, localTab, termCwds } };
+      });
+      return;
+    }
     set((s) => {
       const chat = s.chats[chatId];
       if (!chat) return s;
       const userTerms = (chat.userTerms ?? []).filter((id) => id !== termId);
       const localTab =
         chat.localTab === termId ? (userTerms[userTerms.length - 1] ?? "agent") : chat.localTab;
-      return { chats: { ...s.chats, [chatId]: { ...chat, userTerms, localTab } } };
+      const termCwds = { ...chat.termCwds };
+      delete termCwds[termId];
+      return { chats: { ...s.chats, [chatId]: { ...chat, userTerms, localTab, termCwds } } };
     });
   },
 
   setLocalTab(chatId, tab) {
+    if (chatId === WORKSPACE_TERM_ID) {
+      set((s) => ({ workspaceTerm: { ...s.workspaceTerm, localTab: tab } }));
+      return;
+    }
     set((s) => {
       const chat = s.chats[chatId];
       if (!chat) return s;
@@ -1508,6 +1635,18 @@ export const useAppStore = create<AppState>((set, get) => ({
       return { chats: { ...s.chats, [chatId]: { ...chat, treeOpen: open } } };
     });
     if (open) get().requestTree(chatId);
+  },
+
+  setFilesOpen(chatId, open) {
+    set((s) => {
+      const chat = s.chats[chatId];
+      if (!chat) return s;
+      return { chats: { ...s.chats, [chatId]: { ...chat, filesOpen: open } } };
+    });
+  },
+
+  setWorkspaceFilesOpen(open) {
+    set({ workspaceFilesOpen: open });
   },
 
   fork(chatId, entryId, summarize) {
@@ -1672,6 +1811,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         defaultProjectCwd,
         appMode,
         recentProjects,
+        e2bConfigured: Boolean(config.e2bApiKey),
         ...(!get().activeProjectPath ? { activeProjectPath: defaultProjectCwd, activeProjectIsGit: false } : {}),
       });
       const authed = new Set(providers.filter((p) => p.authenticated).map((p) => p.id));

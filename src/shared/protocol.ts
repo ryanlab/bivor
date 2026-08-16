@@ -588,6 +588,27 @@ export interface CheckpointFileDiff {
   patch: string;
 }
 
+export type CheckpointFileContent =
+  | { kind: "text"; content: string }
+  | { kind: "missing" }
+  | { kind: "binary" };
+
+/** Pop-out code editor window session. */
+export interface EditorSession {
+  cwd: string;
+  paths: string[];
+  active?: string;
+  diffPaths?: string[];
+  baselineId?: string;
+  revisions?: Record<string, number>;
+}
+
+export interface EditorOpenFile {
+  path: string;
+  diff?: boolean;
+  baselineId?: string;
+}
+
 export interface UsageModelStat {
   model: string;
   messages: number;
@@ -763,7 +784,22 @@ export const IPC = {
   checkpointRestore: "checkpoint:restore",
   checkpointDiff: "checkpoint:diff",
   checkpointRestoreFile: "checkpoint:restoreFile",
+  checkpointReadFile: "checkpoint:readFile",
   listProjectFiles: "files:list",
+  listProjectTree: "files:tree",
+  filesCreate: "files:create",
+  filesRename: "files:rename",
+  filesDelete: "files:delete",
+  filesCopy: "files:copy",
+  filesMove: "files:move",
+  filesRead: "files:read",
+  filesWrite: "files:write",
+  filesGitStatus: "files:gitStatus",
+  filesGitHead: "files:gitHead",
+  filesGitRevert: "files:gitRevert",
+  filesWatch: "files:watch",
+  filesUnwatch: "files:unwatch",
+  filesChanged: "files:changed",
   isGitRepo: "worktree:isGitRepo",
   createWorktree: "worktree:create",
   listWorktrees: "worktree:list",
@@ -811,7 +847,54 @@ export const IPC = {
   scheduleRunNow: "schedule:runNow",
   scheduleChanged: "schedule:changed", // main -> renderer push
   scheduleTrigger: "schedule:trigger", // main -> renderer push (open-chat 型触发)
+  // 欢迎页工作区云端 VM（不依赖会话 host）
+  workspaceSandboxGet: "workspaceSandbox:get",
+  workspaceSandboxCreate: "workspaceSandbox:create",
+  workspaceSandboxDestroy: "workspaceSandbox:destroy",
+  workspaceSandboxEvent: "workspaceSandbox:event",
+  editorOpen: "editor:open",
+  editorFocus: "editor:focus",
+  editorClose: "editor:close",
+  editorIsOpen: "editor:isOpen",
+  editorGetSession: "editor:getSession",
+  editorPush: "editor:push",
+  editorDock: "editor:dock",
+  editorState: "editor:state",
+  editorInit: "editor:init",
+  editorOpenFile: "editor:openFile",
+  editorOpened: "editor:opened",
+  editorClosed: "editor:closed",
+  editorChanged: "editor:changed",
 } as const;
+
+export type GitFileStatus = "M" | "U" | "A" | "D" | "C";
+
+export interface GitStatusEntry {
+  path: string;
+  status: GitFileStatus;
+  additions?: number;
+  deletions?: number;
+}
+
+/** File content at HEAD, or why a last-commit compare is unavailable. */
+export type GitHeadFile =
+  | { kind: "text"; content: string }
+  | { kind: "missing" }
+  | { kind: "binary" }
+  | { kind: "none" };
+
+export interface FilesChangedPayload {
+  cwd: string;
+  paths: string[];
+  /** True when a path was created, removed, or renamed (tree must reload). */
+  structure: boolean;
+}
+
+export type ProjectFileRead =
+  | { kind: "text"; content: string; truncated: boolean }
+  | { kind: "image"; mime: string; data: string }
+  | { kind: "binary" }
+  | { kind: "tooLarge"; size: number };
 
 export interface ChatCreateOptions {
   cwd: string;

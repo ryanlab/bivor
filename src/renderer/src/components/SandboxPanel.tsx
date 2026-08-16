@@ -19,7 +19,7 @@ function WorldSwitch({ chat }: { chat: ChatState }): React.JSX.Element {
     { id: "vm" as const, label: t("sandbox.vm"), icon: Monitor },
   ];
   return (
-    <div className="flex items-center gap-2 border-b border-border/40 px-3.5 py-2">
+    <div className="flex items-center gap-2 bg-bg-tertiary px-3.5 py-2">
       <span className="text-[11px] text-fg-muted">{t("sandbox.world")}</span>
       <div className="flex overflow-hidden rounded-lg border border-border">
         {worlds.map(({ id, label, icon: Icon }) => {
@@ -52,19 +52,52 @@ function WorldSwitch({ chat }: { chat: ChatState }): React.JSX.Element {
   );
 }
 
-export function SandboxPanel({ chat }: { chat: ChatState }): React.JSX.Element {
+export function SandboxPanel({
+  chat,
+  workspace = false,
+}: {
+  chat?: ChatState;
+  /** 欢迎页：不依赖会话，走 main 进程工作区 VM */
+  workspace?: boolean;
+}): React.JSX.Element {
   const t = useT();
   const setSandboxOpen = useAppStore((s) => s.setSandboxOpen);
+  const setWorkspaceSandboxOpen = useAppStore((s) => s.setWorkspaceSandboxOpen);
   const createSandbox = useAppStore((s) => s.createSandbox);
+  const createWorkspaceSandbox = useAppStore((s) => s.createWorkspaceSandbox);
   const destroySandbox = useAppStore((s) => s.destroySandbox);
+  const destroyWorkspaceSandbox = useAppStore((s) => s.destroyWorkspaceSandbox);
   const setSettingsOpen = useAppStore((s) => s.setSettingsOpen);
+  const workspaceSb = useAppStore((s) => s.workspaceSandbox);
+  const e2bConfigured = useAppStore((s) => s.e2bConfigured);
 
-  const sb = chat.sandbox;
-  const noKey = sb === undefined;
+  const sb = workspace ? workspaceSb : chat?.sandbox;
+  const noKey = workspace ? !e2bConfigured : sb === undefined;
+  const close = (): void => {
+    if (workspace) setWorkspaceSandboxOpen(false);
+    else if (chat) setSandboxOpen(chat.chatId, false);
+  };
+  const refresh = (): void => {
+    if (workspace) {
+      void window.pi.workspaceSandbox.get().then((r) => {
+        useAppStore.getState().setWorkspaceSandboxStatus(r.configured ? r.sandbox : undefined, r.configured);
+      });
+      return;
+    }
+    if (chat) window.pi.chat.command(chat.chatId, { type: "sandbox_status" });
+  };
+  const start = (): void => {
+    if (workspace) createWorkspaceSandbox();
+    else if (chat) createSandbox(chat.chatId);
+  };
+  const destroy = (): void => {
+    if (workspace) destroyWorkspaceSandbox();
+    else if (chat) destroySandbox(chat.chatId);
+  };
 
   return (
-    <div className="flex w-[420px] shrink-0 flex-col bg-transparent">
-      <div className="flex h-11 shrink-0 items-center gap-2 border-b border-border/40 px-3.5">
+    <div className="flex w-[420px] shrink-0 flex-col bg-bg-secondary">
+      <div className="flex h-11 shrink-0 items-center gap-2 px-3.5">
         <Monitor size={14} className="text-fg-muted" />
         <span className="flex-1 text-[13px] font-medium">{t("chat.sandbox")}</span>
         {sb?.status === "running" && (
@@ -76,7 +109,7 @@ export function SandboxPanel({ chat }: { chat: ChatState }): React.JSX.Element {
         <button
           type="button"
           title={t("sandbox.refresh")}
-          onClick={() => window.pi.chat.command(chat.chatId, { type: "sandbox_status" })}
+          onClick={refresh}
           className="rounded-md p-1 text-fg-muted transition-colors hover:bg-bg-hover hover:text-fg-secondary"
         >
           <RefreshCw size={12.5} />
@@ -84,14 +117,14 @@ export function SandboxPanel({ chat }: { chat: ChatState }): React.JSX.Element {
         <button
           type="button"
           title={t("common.close")}
-          onClick={() => setSandboxOpen(chat.chatId, false)}
+          onClick={close}
           className="rounded-md p-1 text-fg-muted transition-colors hover:bg-bg-hover hover:text-fg-secondary"
         >
           <X size={13} />
         </button>
       </div>
 
-      <WorldSwitch chat={chat} />
+      {chat && !workspace && <WorldSwitch chat={chat} />}
 
       <div className="flex min-h-0 flex-1 flex-col">
         {noKey && (
@@ -121,10 +154,12 @@ export function SandboxPanel({ chat }: { chat: ChatState }): React.JSX.Element {
           <div className="flex flex-1 flex-col items-center justify-center gap-3 px-8 text-center">
             <Monitor size={26} className="text-fg-muted" />
             <div className="text-sm font-medium">{t("sandbox.notStarted")}</div>
-            <p className="text-xs leading-relaxed text-fg-muted">{t("sandbox.autoStart")}</p>
+            <p className="text-xs leading-relaxed text-fg-muted">
+              {workspace ? t("sandbox.welcomeHint") : t("sandbox.autoStart")}
+            </p>
             <button
               type="button"
-              onClick={() => createSandbox(chat.chatId)}
+              onClick={start}
               className="flex items-center gap-1.5 rounded-xl bg-accent px-3.5 py-2 text-xs font-medium text-accent-fg hover:bg-accent-hover"
             >
               <Power size={13} />
@@ -148,7 +183,7 @@ export function SandboxPanel({ chat }: { chat: ChatState }): React.JSX.Element {
             </p>
             <button
               type="button"
-              onClick={() => createSandbox(chat.chatId)}
+              onClick={start}
               className="rounded-xl border border-border px-3 py-1.5 text-xs text-fg-secondary hover:border-border-strong"
             >
               {t("common.retry")}
@@ -174,7 +209,7 @@ export function SandboxPanel({ chat }: { chat: ChatState }): React.JSX.Element {
                 <div className="text-xs text-fg-muted">{t("sandbox.streamConnecting")}</div>
               </div>
             )}
-            <div className="flex items-center gap-2 border-t border-border px-3 py-2">
+            <div className="flex items-center gap-2 bg-bg-tertiary px-3 py-2">
               <span className="min-w-0 flex-1 truncate font-mono text-[10.5px] text-fg-muted">
                 {sb.sandboxId}
               </span>
@@ -190,7 +225,7 @@ export function SandboxPanel({ chat }: { chat: ChatState }): React.JSX.Element {
               )}
               <button
                 type="button"
-                onClick={() => destroySandbox(chat.chatId)}
+                onClick={destroy}
                 className="flex items-center gap-1 rounded-lg border border-danger/30 px-2 py-1 text-[11px] text-danger hover:bg-danger/10"
               >
                 <Trash2 size={11} />

@@ -16,6 +16,11 @@ import {
   writeTerminal,
 } from "./terminal";
 import {
+  createWorkspaceSandbox,
+  destroyWorkspaceSandbox,
+  getWorkspaceSandbox,
+} from "./workspace-sandbox";
+import {
   deleteTask,
   listTasks,
   runTaskNow,
@@ -29,9 +34,12 @@ import { cancelLogin, respondToPrompt, startLogin } from "./auth-flow";
 import {
   createCheckpoint,
   diffCheckpoint,
+  readCheckpointFile,
   restoreCheckpoint,
   restoreCheckpointFile,
 } from "./checkpoints";
+import { disposeAllFileWatchers, registerFileWatchIpc } from "./file-watch";
+import { registerEditorIpc } from "./editor-window";
 import { getConfig, setConfig } from "./config";
 import {
   cancelVercelDeployment,
@@ -66,7 +74,20 @@ import {
   saveSkill,
   updatePackages,
 } from "./resources";
-import { listProjectFiles } from "./files";
+import {
+  copyProjectEntry,
+  createProjectEntry,
+  deleteProjectEntry,
+  gitStatus,
+  readGitHead,
+  revertGitFile,
+  listProjectFiles,
+  listProjectTree,
+  moveProjectEntry,
+  readProjectFile,
+  renameProjectEntry,
+  writeProjectFile,
+} from "./files";
 import {
   createWorktree,
   isGitRepo,
@@ -133,6 +154,8 @@ function createWindow(): BrowserWindow {
 }
 
 function registerIpc(): void {
+  registerEditorIpc();
+  registerFileWatchIpc();
   ipcMain.handle(IPC.chatCreate, (event, options: ChatCreateOptions) => {
     const chatId = createChat(event.sender, options);
     return { chatId };
@@ -158,6 +181,9 @@ function registerIpc(): void {
     resizeTerminal(termId, cols, rows),
   );
   ipcMain.on(IPC.termDispose, (_e, termId: string) => disposeTerminal(termId));
+  ipcMain.handle(IPC.workspaceSandboxGet, (e) => getWorkspaceSandbox(e.sender));
+  ipcMain.handle(IPC.workspaceSandboxCreate, (e) => createWorkspaceSandbox(e.sender));
+  ipcMain.handle(IPC.workspaceSandboxDestroy, () => destroyWorkspaceSandbox());
 
   ipcMain.handle(IPC.listModels, () => listModels());
   ipcMain.handle(IPC.listProviders, () => listProviders());
@@ -222,7 +248,33 @@ function registerIpc(): void {
   ipcMain.handle(IPC.checkpointRestoreFile, (_e, cwd: string, id: string, path: string) =>
     restoreCheckpointFile(cwd, id, path),
   );
+  ipcMain.handle(IPC.checkpointReadFile, (_e, cwd: string, id: string, path: string) =>
+    readCheckpointFile(cwd, id, path),
+  );
   ipcMain.handle(IPC.listProjectFiles, (_e, cwd: string) => listProjectFiles(cwd));
+  ipcMain.handle(IPC.listProjectTree, (_e, cwd: string) => listProjectTree(cwd));
+  ipcMain.handle(
+    IPC.filesCreate,
+    (_e, cwd: string, parent: string, name: string, dir: boolean) =>
+      createProjectEntry(cwd, parent, name, dir),
+  );
+  ipcMain.handle(IPC.filesRename, (_e, cwd: string, from: string, name: string) =>
+    renameProjectEntry(cwd, from, name),
+  );
+  ipcMain.handle(IPC.filesDelete, (_e, cwd: string, rel: string) => deleteProjectEntry(cwd, rel));
+  ipcMain.handle(IPC.filesCopy, (_e, cwd: string, from: string, parent: string) =>
+    copyProjectEntry(cwd, from, parent),
+  );
+  ipcMain.handle(IPC.filesMove, (_e, cwd: string, from: string, parent: string) =>
+    moveProjectEntry(cwd, from, parent),
+  );
+  ipcMain.handle(IPC.filesRead, (_e, cwd: string, rel: string) => readProjectFile(cwd, rel));
+  ipcMain.handle(IPC.filesWrite, (_e, cwd: string, rel: string, content: string) =>
+    writeProjectFile(cwd, rel, content),
+  );
+  ipcMain.handle(IPC.filesGitStatus, (_e, cwd: string) => gitStatus(cwd));
+  ipcMain.handle(IPC.filesGitHead, (_e, cwd: string, rel: string) => readGitHead(cwd, rel));
+  ipcMain.handle(IPC.filesGitRevert, (_e, cwd: string, rel: string) => revertGitFile(cwd, rel));
   ipcMain.handle(IPC.isGitRepo, (_e, path: string) => isGitRepo(path));
   ipcMain.handle(IPC.createWorktree, (_e, path: string, hint?: string, baseBranch?: string) =>
     createWorktree(path, hint, baseBranch),
@@ -356,6 +408,11 @@ app.on("before-quit", (event) => {
   event.preventDefault();
   quitting = true;
   stopScheduler();
+  disposeAllFileWatchers();
   disposeAllTerminals();
-  void disposeAllChats().finally(() => app.exit(0));
+  void destroyWorkspaceSandbox()
+    .catch(() => undefined)
+    .finally(() => {
+      void disposeAllChats().finally(() => app.exit(0));
+    });
 });

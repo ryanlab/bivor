@@ -6,8 +6,8 @@ import {
   ChevronUp,
   Cpu,
   FileJson,
+  FolderTree,
   GitBranch,
-  GitCompareArrows,
   Loader2,
   Monitor,
   Search,
@@ -24,8 +24,9 @@ import { isAssistantMessage } from "@/lib/pi-messages";
 import { formatCost, formatTokens, shortenPath } from "@/lib/format";
 import { MessageList } from "@/components/messages/MessageList";
 import { Composer } from "@/components/Composer";
-import { ChangesPanel, collectChanges } from "@/components/ChangesPanel";
 import { WorktreeMergePanel } from "@/components/WorktreeMergePanel";
+import { useGitStatus } from "@/lib/git-status";
+import { FileTreePanel } from "@/components/FileTreePanel";
 import { TreePanel } from "@/components/TreePanel";
 import { Titlebar, WindowChrome, CollapsedTitlebar } from "@/components/WindowChrome";
 import { cn } from "@/lib/cn";
@@ -388,15 +389,16 @@ function StatsPopover({ chat }: { chat: ChatState }): React.JSX.Element {
 export function ChatView({ chat }: { chat: ChatState }): React.JSX.Element {
   const t = useT();
   const setTreeOpen = useAppStore((s) => s.setTreeOpen);
+  const setFilesOpen = useAppStore((s) => s.setFilesOpen);
   const setHarnessOpen = useAppStore((s) => s.setHarnessOpen);
   const setSandboxOpen = useAppStore((s) => s.setSandboxOpen);
   const setTermOpen = useAppStore((s) => s.setTermOpen);
   const sidebarCollapsed = useAppStore((s) => s.sidebarCollapsed);
-  const [showChanges, setShowChanges] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchTarget, setSearchTarget] = useState<number | null>(null);
   const { cost } = useMemo(() => usageSummary(chat), [chat]);
-  const changeCount = useMemo(() => collectChanges(chat).length, [chat]);
+  const { entries: gitEntries } = useGitStatus(chat.cwd);
+  const changeCount = gitEntries.length;
   /** agent 正在本机跑命令时，终端按钮亮起提示 */
   const agentBusy =
     chat.bashRunning ||
@@ -494,21 +496,21 @@ export function ChatView({ chat }: { chat: ChatState }): React.JSX.Element {
         </div>
         {cost > 0 && <span className="text-xs text-fg-muted">{formatCost(cost)}</span>}
         <ContextGauge chat={chat} />
-        {ui.changes && (
+        <StatsPopover chat={chat} />
+        {(ui.fileTree || ui.changes) && (
           <button
             type="button"
-            title={t("chat.changes")}
-            onClick={() => setShowChanges((v) => !v)}
+            title={t("chat.files")}
+            onClick={() => setFilesOpen(chat.chatId, !chat.filesOpen)}
             className={cn(
               "no-drag flex items-center gap-1 rounded-md p-1.5 text-fg-muted transition-colors hover:bg-bg-hover hover:text-fg-secondary",
-              showChanges && "bg-bg-hover text-fg",
+              chat.filesOpen && "bg-bg-hover text-fg",
             )}
           >
-            <GitCompareArrows size={14} />
+            <FolderTree size={14} />
             {changeCount > 0 && <span className="text-[11px]">{changeCount}</span>}
           </button>
         )}
-        <StatsPopover chat={chat} />
         {ui.bashBang && (
           <button
             type="button"
@@ -599,13 +601,17 @@ export function ChatView({ chat }: { chat: ChatState }): React.JSX.Element {
           <Composer chat={chat} />
         </div>
       </div>
-      {((ui.changes && showChanges) || (ui.tree && chat.treeOpen) || (ui.sandbox && chat.sandboxOpen)) && (
-        <div className="flex min-h-0 shrink-0 py-2.5 pr-2.5">
-          <div className="flex min-h-0 divide-x divide-border/40 overflow-hidden rounded-2xl bg-bg-secondary shadow-[inset_0_1px_2px_rgba(0,0,0,0.06)] ring-1 ring-black/[0.04]">
-            {ui.changes && showChanges && <ChangesPanel chat={chat} onClose={() => setShowChanges(false)} />}
-            {ui.tree && chat.treeOpen && <TreePanel chat={chat} />}
-            {ui.sandbox && chat.sandboxOpen && <SandboxPanel chat={chat} />}
-          </div>
+      {(((ui.fileTree || ui.changes) && chat.filesOpen) || (ui.tree && chat.treeOpen) || (ui.sandbox && chat.sandboxOpen)) && (
+        <div className="flex min-h-0 shrink-0 bg-bg-secondary">
+          {(ui.fileTree || ui.changes) && chat.filesOpen && (
+            <FileTreePanel
+              cwd={chat.cwd}
+              chat={chat}
+              onClose={() => setFilesOpen(chat.chatId, false)}
+            />
+          )}
+          {ui.tree && chat.treeOpen && <TreePanel chat={chat} />}
+          {ui.sandbox && chat.sandboxOpen && <SandboxPanel chat={chat} />}
         </div>
       )}
       {ui.harness && chat.harnessOpen && <HarnessCanvas key={chat.chatId} chat={chat} />}

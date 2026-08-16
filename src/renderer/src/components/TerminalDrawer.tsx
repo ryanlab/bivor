@@ -15,11 +15,16 @@ import { cn } from "@/lib/cn";
 import { useT } from "@/lib/i18n";
 
 /** 本机命令沙箱（macOS seatbelt）三档开关：关闭 / 限写工作区 / 严格。 */
-function SandboxModeSwitch({ chat }: { chat: ChatState }): React.JSX.Element | null {
+function SandboxModeSwitch({
+  chatId,
+  mode = "off",
+}: {
+  chatId: string;
+  mode?: LocalSandboxMode;
+}): React.JSX.Element | null {
   const t = useT();
   const setLocalSandbox = useAppStore((s) => s.setLocalSandbox);
   if (window.pi.system.platform !== "darwin") return null;
-  const mode = chat.localSandbox ?? "off";
   const modes: { id: LocalSandboxMode; label: string }[] = [
     { id: "off", label: t("sandbox.modeOff") },
     { id: "workspace", label: t("sandbox.modeWorkspace") },
@@ -33,7 +38,7 @@ function SandboxModeSwitch({ chat }: { chat: ChatState }): React.JSX.Element | n
           <button
             key={id}
             type="button"
-            onClick={() => setLocalSandbox(chat.chatId, id)}
+            onClick={() => setLocalSandbox(chatId, id)}
             className={cn(
               "px-1.5 py-0.5 text-[10.5px] transition-colors",
               mode === id
@@ -49,7 +54,29 @@ function SandboxModeSwitch({ chat }: { chat: ChatState }): React.JSX.Element | n
   );
 }
 
-export function TerminalDrawer({ chat }: { chat: ChatState }): React.JSX.Element {
+export type TermDrawerSession = Pick<ChatState, "chatId" | "cwd"> &
+  Partial<
+    Pick<
+      ChatState,
+      | "userTerms"
+      | "termCwds"
+      | "localTab"
+      | "agentTermUsed"
+      | "bashRunning"
+      | "toolRuns"
+      | "localTerm"
+      | "localSandbox"
+    >
+  >;
+
+export function TerminalDrawer({
+  chat,
+  sandbox = true,
+}: {
+  chat: TermDrawerSession;
+  /** 欢迎页没有会话 host，不展示 seatbelt 开关 */
+  sandbox?: boolean;
+}): React.JSX.Element {
   const t = useT();
   const setTermOpen = useAppStore((s) => s.setTermOpen);
   const clearLocalTerm = useAppStore((s) => s.clearLocalTerm);
@@ -64,7 +91,7 @@ export function TerminalDrawer({ chat }: { chat: ChatState }): React.JSX.Element
   /** agent 是否正在跑命令（bash / code_run 工具，或用户 ! 直跑） */
   const agentBusy =
     chat.bashRunning ||
-    Object.values(chat.toolRuns).some(
+    Object.values(chat.toolRuns ?? {}).some(
       (r) => r.status === "running" && (r.toolName === "bash" || r.toolName === "code_run"),
     );
 
@@ -84,7 +111,7 @@ export function TerminalDrawer({ chat }: { chat: ChatState }): React.JSX.Element
 
   return (
     <div className="flex h-[280px] shrink-0 flex-col border-t border-border/40 bg-bg">
-      <div className="flex shrink-0 items-center gap-1 border-b border-border/40 px-3 py-1.5">
+      <div className="flex shrink-0 items-center gap-1 px-3 py-1.5">
         {userTerms.map((termId, i) => (
           <span
             key={termId}
@@ -148,7 +175,7 @@ export function TerminalDrawer({ chat }: { chat: ChatState }): React.JSX.Element
 
         <div className="flex-1" />
 
-        <SandboxModeSwitch chat={chat} />
+        {sandbox && <SandboxModeSwitch chatId={chat.chatId} mode={chat.localSandbox} />}
         {localTab === "agent" && (
           <button
             type="button"
@@ -176,7 +203,12 @@ export function TerminalDrawer({ chat }: { chat: ChatState }): React.JSX.Element
           placeholder={t("sandbox.termEmpty")}
         />
       ) : localTab ? (
-        <UserTerminal key={localTab} chatId={chat.chatId} termId={localTab} cwd={chat.cwd} />
+        <UserTerminal
+          key={localTab}
+          chatId={chat.chatId}
+          termId={localTab}
+          cwd={chat.termCwds?.[localTab] ?? chat.cwd}
+        />
       ) : (
         <div className="flex-1" />
       )}

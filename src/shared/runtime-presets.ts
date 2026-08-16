@@ -18,6 +18,8 @@ export interface RuntimePresetUi {
   changes: boolean;
   /** 会话树 / 分支 */
   tree: boolean;
+  /** 项目文件树 */
+  fileTree: boolean;
   /** 云端沙箱 VM */
   sandbox: boolean;
   /** Harness 画布 */
@@ -154,6 +156,7 @@ const CODING_TOOL_NAMES = [
 const FULL_UI: RuntimePresetUi = {
   changes: true,
   tree: true,
+  fileTree: true,
   sandbox: true,
   harness: true,
   fileMention: true,
@@ -174,6 +177,7 @@ export const RUNTIME_PRESETS: RuntimePresetDef[] = [
     ui: {
       changes: false,
       tree: false,
+      fileTree: false,
       sandbox: false,
       harness: false,
       fileMention: false,

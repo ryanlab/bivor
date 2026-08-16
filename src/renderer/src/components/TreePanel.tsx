@@ -87,8 +87,8 @@ export function TreePanel({ chat }: { chat: ChatState }): React.JSX.Element {
   const branchCount = flat.filter((f) => f.node.children.length > 1).length;
 
   return (
-    <div className="flex w-[300px] shrink-0 flex-col bg-transparent">
-      <div className="flex h-11 shrink-0 items-center gap-2 border-b border-border/40 px-3.5">
+    <div className="flex w-[300px] shrink-0 flex-col bg-bg-secondary">
+      <div className="flex h-11 shrink-0 items-center gap-2 px-3.5">
         <GitBranch size={14} className="text-fg-muted" />
         <span className="flex-1 text-[13px] font-medium">{t("tree.title")}</span>
         <button
@@ -117,7 +117,7 @@ export function TreePanel({ chat }: { chat: ChatState }): React.JSX.Element {
           <NodeRow key={f.node.id} flat={f} chat={chat} />
         ))}
       </div>
-      <div className="border-t border-border px-3.5 py-2 text-[11px] leading-relaxed text-fg-muted">
+      <div className="bg-bg-tertiary px-3.5 py-2 text-[11px] leading-relaxed text-fg-muted">
         {t("tree.hint", { extra: branchCount > 0 ? t("tree.branches", { n: branchCount }) : "" })}
       </div>
     </div>

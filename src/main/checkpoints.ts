@@ -140,6 +140,39 @@ export async function diffCheckpoint(cwd: string, id: string): Promise<Checkpoin
   }
 }
 
+export type CheckpointFileContent =
+  | { kind: "text"; content: string }
+  | { kind: "missing" }
+  | { kind: "binary" };
+
+const MAX_BASELINE_BYTES = 2 * 1024 * 1024;
+
+/** Read a file's content at a checkpoint (for the editor merge view). */
+export async function readCheckpointFile(
+  cwd: string,
+  id: string,
+  path: string,
+): Promise<CheckpointFileContent> {
+  if (path.startsWith("/") || path.split("/").includes("..")) {
+    throw new Error("非法文件路径");
+  }
+  const commit = await git(cwd, ["rev-parse", `refs/pi-checkpoints/${id}`]);
+  try {
+    await git(cwd, ["cat-file", "-e", `${commit}:${path}`]);
+  } catch {
+    return { kind: "missing" };
+  }
+  const size = Number(await git(cwd, ["cat-file", "-s", `${commit}:${path}`]));
+  if (!Number.isFinite(size) || size > MAX_BASELINE_BYTES) return { kind: "binary" };
+  const { stdout } = await exec("git", ["cat-file", "blob", `${commit}:${path}`], {
+    cwd,
+    timeout: 30000,
+    maxBuffer: MAX_BASELINE_BYTES + 1,
+  });
+  if (stdout.includes("\0")) return { kind: "binary" };
+  return { kind: "text", content: stdout };
+}
+
 /** Restore a single file to its checkpoint state. */
 export async function restoreCheckpointFile(
   cwd: string,

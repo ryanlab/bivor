@@ -291,7 +291,7 @@ export function WelcomeScreen(): React.JSX.Element {
   };
 
   return (
-    <div className="relative flex flex-1 flex-col overflow-y-auto [scrollbar-gutter:stable]">
+    <div className="relative flex min-h-0 flex-1 flex-col overflow-y-auto [scrollbar-gutter:stable]">
       <div
         aria-hidden
         className="font-serif-display pointer-events-none absolute right-[6%] top-[8%] select-none text-[220px] leading-none text-fg opacity-[0.035]"

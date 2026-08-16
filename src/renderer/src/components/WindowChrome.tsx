@@ -1,5 +1,7 @@
+import { FolderTree, Monitor, SquareTerminal } from "lucide-react";
 import { TITLEBAR_HEIGHT } from "@shared/titlebar";
-import { useAppStore } from "@/stores/app-store";
+import { getRuntimePreset } from "@shared/runtime-presets";
+import { useAppStore, WORKSPACE_TERM_ID } from "@/stores/app-store";
 import { cn } from "@/lib/cn";
 import { useT } from "@/lib/i18n";
 
@@ -153,6 +155,109 @@ export function CollapsedTitlebar(): React.JSX.Element | null {
   return (
     <Titlebar>
       <WindowChrome trafficLights />
+    </Titlebar>
+  );
+}
+
+function IdleIconButton({
+  title,
+  open,
+  live,
+  onToggle,
+  children,
+}: {
+  title: string;
+  open: boolean;
+  live?: boolean;
+  onToggle: () => void;
+  children: React.ReactNode;
+}): React.JSX.Element {
+  return (
+    <button
+      type="button"
+      title={title}
+      onClick={onToggle}
+      className={cn(
+        "no-drag relative rounded-md p-1.5 text-fg-muted transition-colors hover:bg-bg-hover hover:text-fg-secondary",
+        open && "bg-bg-hover text-fg",
+      )}
+    >
+      {children}
+      {live && <span className="absolute right-0.5 top-0.5 h-1.5 w-1.5 rounded-full bg-success" />}
+    </button>
+  );
+}
+
+/**
+ * 无会话时的标题栏：侧栏收起时放窗口控件；编程模式右上角放文件树 / 终端 / 虚拟机。
+ */
+export function IdleTitlebar(): React.JSX.Element | null {
+  const t = useT();
+  const collapsed = useAppStore((s) => s.sidebarCollapsed);
+  const appMode = useAppStore((s) => s.appMode);
+  const codingPresetId = useAppStore((s) => s.codingPresetId);
+  const cwd = useAppStore((s) => s.activeProjectPath ?? s.defaultProjectCwd);
+  const termOpen = useAppStore((s) => s.workspaceTerm.open);
+  const setTermOpen = useAppStore((s) => s.setTermOpen);
+  const sandboxOpen = useAppStore((s) => s.workspaceSandboxOpen);
+  const setSandboxOpen = useAppStore((s) => s.setWorkspaceSandboxOpen);
+  const sandboxLive = useAppStore((s) => s.workspaceSandbox?.status === "running");
+  const filesOpen = useAppStore((s) => s.workspaceFilesOpen);
+  const setFilesOpen = useAppStore((s) => s.setWorkspaceFilesOpen);
+  const preset = getRuntimePreset(appMode === "daily" ? "daily" : codingPresetId, appMode);
+  const showTerm = preset.ui.bashBang && Boolean(cwd);
+  const showSandbox = preset.ui.sandbox;
+  const showFiles = preset.ui.fileTree && Boolean(cwd);
+  const icons = (showTerm || showSandbox || showFiles) && (
+    <div className="pointer-events-auto flex items-center gap-2">
+      {showFiles && (
+        <IdleIconButton
+          title={t("chat.files")}
+          open={filesOpen}
+          onToggle={() => setFilesOpen(!filesOpen)}
+        >
+          <FolderTree size={14} />
+        </IdleIconButton>
+      )}
+      {showTerm && (
+        <IdleIconButton
+          title={t("chat.terminal")}
+          open={termOpen}
+          onToggle={() => setTermOpen(WORKSPACE_TERM_ID, !termOpen)}
+        >
+          <SquareTerminal size={14} />
+        </IdleIconButton>
+      )}
+      {showSandbox && (
+        <IdleIconButton
+          title={t("chat.sandbox")}
+          open={sandboxOpen}
+          live={sandboxLive}
+          onToggle={() => setSandboxOpen(!sandboxOpen)}
+        >
+          <Monitor size={14} />
+        </IdleIconButton>
+      )}
+    </div>
+  );
+
+  if (!collapsed) {
+    if (!icons) return null;
+    return (
+      <div
+        className="pointer-events-none absolute right-0 top-0 z-20 flex items-center justify-end pr-4"
+        style={{ height: TITLEBAR_HEIGHT }}
+      >
+        {icons}
+      </div>
+    );
+  }
+
+  return (
+    <Titlebar className="gap-2 pr-4">
+      <WindowChrome trafficLights />
+      <div className="min-w-0 flex-1" />
+      {icons}
     </Titlebar>
   );
 }

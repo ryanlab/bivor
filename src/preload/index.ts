@@ -6,13 +6,20 @@ import type {
   AuthFlowEvent,
   ChatCreateOptions,
   ChatCreateResult,
+  CheckpointFileContent,
   CheckpointFileDiff,
+  EditorOpenFile,
+  EditorSession,
+  FilesChangedPayload,
+  GitHeadFile,
+  GitStatusEntry,
   HostCommand,
   HostEventEnvelope,
   McpConfigInfo,
   ModelInfo,
   PackageItem,
   PackageProgressPayload,
+  ProjectFileRead,
   ProviderInfo,
   SessionListItem,
   SessionSearchHit,
@@ -26,6 +33,7 @@ import type {
   VercelDeploymentInfo,
   VercelProjectDetail,
   VercelProjectInfo,
+  SandboxStatusPayload,
 } from "@shared/protocol";
 import { IPC } from "@shared/protocol";
 
@@ -116,9 +124,77 @@ const api = {
       ipcRenderer.invoke(IPC.checkpointDiff, cwd, id),
     restoreFile: (cwd: string, id: string, path: string): Promise<void> =>
       ipcRenderer.invoke(IPC.checkpointRestoreFile, cwd, id, path),
+    readFile: (cwd: string, id: string, path: string): Promise<CheckpointFileContent> =>
+      ipcRenderer.invoke(IPC.checkpointReadFile, cwd, id, path),
+  },
+  editor: {
+    open: (session: EditorSession): Promise<void> => ipcRenderer.invoke(IPC.editorOpen, session),
+    focus: (): Promise<void> => ipcRenderer.invoke(IPC.editorFocus),
+    close: (): Promise<void> => ipcRenderer.invoke(IPC.editorClose),
+    isOpen: (): Promise<boolean> => ipcRenderer.invoke(IPC.editorIsOpen),
+    getSession: (): Promise<EditorSession | null> => ipcRenderer.invoke(IPC.editorGetSession),
+    push: (file: EditorOpenFile): Promise<boolean> => ipcRenderer.invoke(IPC.editorPush, file),
+    dock: (): Promise<void> => ipcRenderer.invoke(IPC.editorDock),
+    report: (session: EditorSession): void => {
+      ipcRenderer.send(IPC.editorState, session);
+    },
+    onInit: (listener: (session: EditorSession) => void): (() => void) => {
+      const handler = (_e: unknown, session: EditorSession): void => listener(session);
+      ipcRenderer.on(IPC.editorInit, handler);
+      return () => ipcRenderer.removeListener(IPC.editorInit, handler);
+    },
+    onOpenFile: (listener: (file: EditorOpenFile) => void): (() => void) => {
+      const handler = (_e: unknown, file: EditorOpenFile): void => listener(file);
+      ipcRenderer.on(IPC.editorOpenFile, handler);
+      return () => ipcRenderer.removeListener(IPC.editorOpenFile, handler);
+    },
+    onOpened: (listener: (session: EditorSession) => void): (() => void) => {
+      const handler = (_e: unknown, session: EditorSession): void => listener(session);
+      ipcRenderer.on(IPC.editorOpened, handler);
+      return () => ipcRenderer.removeListener(IPC.editorOpened, handler);
+    },
+    onClosed: (listener: (session: EditorSession | null) => void): (() => void) => {
+      const handler = (_e: unknown, session: EditorSession | null): void => listener(session);
+      ipcRenderer.on(IPC.editorClosed, handler);
+      return () => ipcRenderer.removeListener(IPC.editorClosed, handler);
+    },
+    onChanged: (listener: (session: EditorSession) => void): (() => void) => {
+      const handler = (_e: unknown, session: EditorSession): void => listener(session);
+      ipcRenderer.on(IPC.editorChanged, handler);
+      return () => ipcRenderer.removeListener(IPC.editorChanged, handler);
+    },
   },
   files: {
     list: (cwd: string): Promise<string[]> => ipcRenderer.invoke(IPC.listProjectFiles, cwd),
+    tree: (cwd: string): Promise<{ path: string; dir: boolean }[]> =>
+      ipcRenderer.invoke(IPC.listProjectTree, cwd),
+    create: (cwd: string, parent: string, name: string, dir: boolean): Promise<string> =>
+      ipcRenderer.invoke(IPC.filesCreate, cwd, parent, name, dir),
+    rename: (cwd: string, from: string, name: string): Promise<string> =>
+      ipcRenderer.invoke(IPC.filesRename, cwd, from, name),
+    delete: (cwd: string, rel: string): Promise<void> =>
+      ipcRenderer.invoke(IPC.filesDelete, cwd, rel),
+    copy: (cwd: string, from: string, parent: string): Promise<string> =>
+      ipcRenderer.invoke(IPC.filesCopy, cwd, from, parent),
+    move: (cwd: string, from: string, parent: string): Promise<string> =>
+      ipcRenderer.invoke(IPC.filesMove, cwd, from, parent),
+    read: (cwd: string, rel: string): Promise<ProjectFileRead> =>
+      ipcRenderer.invoke(IPC.filesRead, cwd, rel),
+    write: (cwd: string, rel: string, content: string): Promise<void> =>
+      ipcRenderer.invoke(IPC.filesWrite, cwd, rel, content),
+    gitStatus: (cwd: string): Promise<GitStatusEntry[]> =>
+      ipcRenderer.invoke(IPC.filesGitStatus, cwd),
+    readHead: (cwd: string, rel: string): Promise<GitHeadFile> =>
+      ipcRenderer.invoke(IPC.filesGitHead, cwd, rel),
+    revert: (cwd: string, rel: string): Promise<void> =>
+      ipcRenderer.invoke(IPC.filesGitRevert, cwd, rel),
+    watch: (cwd: string): Promise<void> => ipcRenderer.invoke(IPC.filesWatch, cwd),
+    unwatch: (cwd: string): Promise<void> => ipcRenderer.invoke(IPC.filesUnwatch, cwd),
+    onChanged: (listener: (payload: FilesChangedPayload) => void): (() => void) => {
+      const handler = (_e: unknown, payload: FilesChangedPayload): void => listener(payload);
+      ipcRenderer.on(IPC.filesChanged, handler);
+      return () => ipcRenderer.removeListener(IPC.filesChanged, handler);
+    },
   },
   worktrees: {
     isGitRepo: (path: string): Promise<boolean> => ipcRenderer.invoke(IPC.isGitRepo, path),
@@ -202,6 +278,17 @@ const api = {
       const handler = (_event: unknown, task: ScheduledTask): void => listener(task);
       ipcRenderer.on(IPC.scheduleTrigger, handler);
       return () => ipcRenderer.removeListener(IPC.scheduleTrigger, handler);
+    },
+  },
+  workspaceSandbox: {
+    get: (): Promise<{ configured: boolean; sandbox?: SandboxStatusPayload }> =>
+      ipcRenderer.invoke(IPC.workspaceSandboxGet),
+    create: (): Promise<SandboxStatusPayload> => ipcRenderer.invoke(IPC.workspaceSandboxCreate),
+    destroy: (): Promise<void> => ipcRenderer.invoke(IPC.workspaceSandboxDestroy),
+    onStatus: (listener: (status: SandboxStatusPayload) => void): (() => void) => {
+      const handler = (_e: unknown, status: SandboxStatusPayload): void => listener(status);
+      ipcRenderer.on(IPC.workspaceSandboxEvent, handler);
+      return () => ipcRenderer.removeListener(IPC.workspaceSandboxEvent, handler);
     },
   },
   term: {

@@ -1,10 +1,13 @@
 import { useEffect } from "react";
-import { useAppStore } from "@/stores/app-store";
+import { useAppStore, WORKSPACE_TERM_ID } from "@/stores/app-store";
 import { Sidebar } from "@/components/Sidebar";
-import { CollapsedTitlebar } from "@/components/WindowChrome";
+import { IdleTitlebar } from "@/components/WindowChrome";
 import { ChatView } from "@/components/ChatView";
 import { MissionControl } from "@/components/MissionControl";
 import { WelcomeScreen } from "@/components/WelcomeScreen";
+import { TerminalDrawer } from "@/components/TerminalDrawer";
+import { SandboxPanel } from "@/components/SandboxPanel";
+import { FileTreePanel } from "@/components/FileTreePanel";
 import { SettingsDialog } from "@/components/SettingsDialog";
 import { CommandPalette } from "@/components/CommandPalette";
 import { ResourcesDialog } from "@/components/ResourcesDialog";
@@ -25,6 +28,11 @@ export default function App(): React.JSX.Element {
   const sidebarCollapsed = useAppStore((s) => s.sidebarCollapsed);
   const shortcutsOpen = useAppStore((s) => s.shortcutsOpen);
   const setShortcutsOpen = useAppStore((s) => s.setShortcutsOpen);
+  const workspaceCwd = useAppStore((s) => s.activeProjectPath ?? s.defaultProjectCwd);
+  const workspaceTerm = useAppStore((s) => s.workspaceTerm);
+  const workspaceSandboxOpen = useAppStore((s) => s.workspaceSandboxOpen);
+  const workspaceFilesOpen = useAppStore((s) => s.workspaceFilesOpen);
+  const setWorkspaceFilesOpen = useAppStore((s) => s.setWorkspaceFilesOpen);
 
   useEffect(() => {
     const unsubscribe = window.pi.chat.onEvent(handleEnvelope);
@@ -46,6 +54,9 @@ export default function App(): React.JSX.Element {
       new Notification(tt("notify.agentCrashTitle"), {
         body: tt("notify.agentCrashBody", { name, code: payload.code }),
       });
+    });
+    const unsubWorkspaceSandbox = window.pi.workspaceSandbox.onStatus((status) => {
+      useAppStore.getState().setWorkspaceSandboxStatus(status, true);
     });
     const unsubMenu = window.pi.system.onMenuAction((action) => {
       const s = useAppStore.getState();
@@ -93,6 +104,7 @@ export default function App(): React.JSX.Element {
       unsubScheduleChanged();
       unsubScheduleTrigger();
       unsubAgentCrash();
+      unsubWorkspaceSandbox();
       unsubMenu();
       window.removeEventListener("keydown", onKeyDown);
     };
@@ -107,13 +119,37 @@ export default function App(): React.JSX.Element {
     <div className="flex h-full">
       {!sidebarCollapsed && <Sidebar />}
       <main className="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
-        {!activeChat && <CollapsedTitlebar />}
-        {activeChat ? (
-          <ChatView chat={activeChat} />
-        ) : activeView === "welcome" ? (
-          <WelcomeScreen />
-        ) : (
-          <MissionControl />
+        <div className="flex min-h-0 min-w-0 flex-1 overflow-hidden">
+          <div className="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+            {!activeChat && <IdleTitlebar />}
+            {activeChat ? (
+              <ChatView chat={activeChat} />
+            ) : activeView === "welcome" ? (
+              <WelcomeScreen />
+            ) : (
+              <MissionControl />
+            )}
+          </div>
+          {!activeChat && (workspaceFilesOpen || workspaceSandboxOpen) && (
+            <div className="flex min-h-0 shrink-0 bg-bg-secondary">
+              {workspaceFilesOpen && workspaceCwd && (
+                <FileTreePanel cwd={workspaceCwd} onClose={() => setWorkspaceFilesOpen(false)} />
+              )}
+              {workspaceSandboxOpen && <SandboxPanel workspace />}
+            </div>
+          )}
+        </div>
+        {!activeChat && workspaceTerm.open && workspaceCwd && (
+          <TerminalDrawer
+            sandbox={false}
+            chat={{
+              chatId: WORKSPACE_TERM_ID,
+              cwd: workspaceCwd,
+              userTerms: workspaceTerm.userTerms,
+              localTab: workspaceTerm.localTab,
+              termCwds: workspaceTerm.termCwds,
+            }}
+          />
         )}
       </main>
       <SettingsDialog />
