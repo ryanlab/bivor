@@ -1835,6 +1835,9 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   async renameSession(path, name) {
+    set({
+      sessions: get().sessions.map((s) => (s.path === path ? { ...s, name } : s)),
+    });
     // If the session is open in a chat, rename through its host to avoid
     // concurrent writes to the same JSONL file.
     const open = Object.values(get().chats).find((c) => c.sessionFile === path);
