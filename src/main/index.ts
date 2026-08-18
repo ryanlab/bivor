@@ -43,6 +43,7 @@ import {
 import { disposeAllFileWatchers, registerFileWatchIpc } from "./file-watch";
 import { registerEditorIpc } from "./editor-window";
 import { getConfig, setConfig } from "./config";
+import { sendBarkPush } from "./bark";
 import {
   cancelVercelDeployment,
   deleteVercelDeployment,
@@ -53,8 +54,8 @@ import {
   listVercelDeployments,
   listVercelProjects,
   promoteVercelDeployment,
-  redeployVercelDeployment,
   rollbackVercelDeployment,
+  testVercelToken,
 } from "./deployments";
 import {
   createPrompt,
@@ -257,6 +258,18 @@ function registerIpc(): void {
     if ("locale" in patch) installMenu();
     return next;
   });
+  ipcMain.handle(
+    IPC.barkTest,
+    (
+      _e,
+      opts?: { deviceUrl?: string; title?: string; body?: string },
+    ): Promise<{ ok: boolean; error?: string }> =>
+      sendBarkPush({
+        title: opts?.title || mt("notify.barkTestTitle"),
+        body: opts?.body || mt("notify.barkTestBody"),
+        deviceUrl: opts?.deviceUrl,
+      }),
+  );
   ipcMain.handle(IPC.packagesList, (_e, cwd: string) => listPackages(cwd));
   ipcMain.handle(IPC.packagesInstall, (e, cwd: string, source: string, local: boolean) =>
     installPackage(cwd, source, local, e.sender),
@@ -359,14 +372,15 @@ function registerIpc(): void {
   );
   ipcMain.handle(IPC.deploymentsCancel, (_e, id: string) => cancelVercelDeployment(id));
   ipcMain.handle(IPC.deploymentsDelete, (_e, id: string) => deleteVercelDeployment(id));
-  ipcMain.handle(IPC.deploymentsRedeploy, (_e, id: string, name: string, target?: "production") =>
-    redeployVercelDeployment(id, name, target),
-  );
   ipcMain.handle(IPC.deploymentsPromote, (_e, projectId: string, id: string) =>
     promoteVercelDeployment(projectId, id),
   );
   ipcMain.handle(IPC.deploymentsRollback, (_e, projectId: string, id: string) =>
     rollbackVercelDeployment(projectId, id),
+  );
+  ipcMain.handle(
+    IPC.deploymentsTest,
+    (_e, opts?: { token?: string; teamId?: string }) => testVercelToken(opts),
   );
   ipcMain.handle(IPC.authStartLogin, (e, providerId: string) =>
     startLogin(e.sender, getRuntime, providerId),

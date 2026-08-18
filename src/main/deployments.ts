@@ -1,6 +1,6 @@
 /**
  * 部署运维服务（main 进程）：基于 Vercel REST API 的独立运维模块。
- * 与 host 里的 deploy 工具共用同一份 token 配置（设置 → 部署），
+ * 与 host 里的 deploy 工具共用同一份 token 配置（设置 → 部署运维（Vercel）），
  * 但这里是「人在看、人在管」的面板后端：状态监测、日志、重部署、
  * 提升生产、回滚、取消、删除。
  */
@@ -9,6 +9,7 @@ import type {
   VercelDeploymentInfo,
   VercelProjectDetail,
   VercelProjectInfo,
+  VercelTestResult,
 } from "@shared/protocol";
 import { getConfig } from "./config";
 
@@ -17,29 +18,35 @@ const TIMEOUT_MS = 20_000;
 
 function credentials(): { token: string; teamId?: string } {
   const token = getConfig().vercelToken?.trim();
-  if (!token) throw new Error("未配置 Vercel Token（设置 → 部署）");
+  if (!token) throw new Error("未配置 Vercel Token（设置 → 部署运维（Vercel））");
   return { token, teamId: getConfig().vercelTeamId?.trim() || undefined };
 }
 
-async function vercel(path: string, init?: RequestInit): Promise<Response> {
-  const { token, teamId } = credentials();
+async function vercelFetch(
+  path: string,
+  creds: { token: string; teamId?: string },
+  init?: RequestInit,
+): Promise<Response> {
   const url = new URL(`${API}${path}`);
-  if (teamId) url.searchParams.set("teamId", teamId);
+  if (creds.teamId) url.searchParams.set("teamId", creds.teamId);
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), TIMEOUT_MS);
   try {
     return await fetch(url, {
       ...init,
       signal: ctrl.signal,
-      headers: { Authorization: `Bearer ${token}`, ...init?.headers },
+      headers: { Authorization: `Bearer ${creds.token}`, ...init?.headers },
     });
   } finally {
     clearTimeout(timer);
   }
 }
 
-async function expectOk(res: Response): Promise<void> {
-  if (res.ok) return;
+async function vercel(path: string, init?: RequestInit): Promise<Response> {
+  return vercelFetch(path, credentials(), init);
+}
+
+async function readVercelError(res: Response): Promise<string> {
   const text = await res.text();
   let message = text.slice(0, 300) || `HTTP ${res.status}`;
   try {
@@ -48,11 +55,45 @@ async function expectOk(res: Response): Promise<void> {
   } catch {
     // keep raw text
   }
-  throw new Error(message);
+  return message;
+}
+
+async function expectOk(res: Response): Promise<void> {
+  if (res.ok) return;
+  throw new Error(await readVercelError(res));
 }
 
 export function deploymentsConfigured(): boolean {
   return Boolean(getConfig().vercelToken?.trim());
+}
+
+/** 用当前输入（可尚未保存）探测 Token / Team ID 是否有效。 */
+export async function testVercelToken(opts?: {
+  token?: string;
+  teamId?: string;
+}): Promise<VercelTestResult> {
+  const token = (opts?.token ?? getConfig().vercelToken)?.trim();
+  if (!token) return { ok: false, error: "missing" };
+  const teamId = (opts?.teamId ?? getConfig().vercelTeamId)?.trim() || undefined;
+
+  try {
+    const userRes = await vercelFetch("/v2/user", { token });
+    if (!userRes.ok) return { ok: false, error: await readVercelError(userRes) };
+    const body = (await userRes.json()) as {
+      user?: { username?: string; name?: string; email?: string };
+    };
+    const username = body.user?.username || body.user?.name || body.user?.email;
+
+    if (!teamId) return { ok: true, username };
+
+    const teamRes = await vercelFetch(`/v2/teams/${encodeURIComponent(teamId)}`, { token });
+    if (!teamRes.ok) return { ok: false, error: await readVercelError(teamRes) };
+    const team = (await teamRes.json()) as { name?: string; slug?: string };
+    return { ok: true, username, teamName: team.name || team.slug };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    return { ok: false, error: message };
+  }
 }
 
 export async function listVercelProjects(): Promise<VercelProjectInfo[]> {
@@ -262,21 +303,6 @@ export async function deleteVercelDeployment(deploymentId: string): Promise<void
     method: "DELETE",
   });
   await expectOk(res);
-}
-
-/** 用同一份源码新建一次部署（配置继承原部署，可切换 preview/production）。 */
-export async function redeployVercelDeployment(
-  deploymentId: string,
-  name: string,
-  target?: "production",
-): Promise<VercelDeploymentInfo> {
-  const res = await vercel("/v13/deployments?forceNew=1", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ deploymentId, name, ...(target ? { target } : {}) }),
-  });
-  await expectOk(res);
-  return mapDeployment((await res.json()) as RawDeployment);
 }
 
 /** 把生产流量指向指定部署（promote）。 */

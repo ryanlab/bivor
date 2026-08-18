@@ -47,9 +47,6 @@ export default function App(): React.JSX.Element {
     const unsubScheduleChanged = window.pi.schedule.onChanged((tasks) => {
       useAppStore.setState({ scheduledTasks: tasks });
     });
-    const unsubScheduleTrigger = window.pi.schedule.onTrigger((task) => {
-      useAppStore.getState().handleScheduleTrigger(task);
-    });
     const unsubAgentCrash = window.pi.monitor.onAgentCrash((payload) => {
       if (Notification.permission === "denied") return;
       const name =
@@ -107,7 +104,6 @@ export default function App(): React.JSX.Element {
     return () => {
       unsubscribe();
       unsubScheduleChanged();
-      unsubScheduleTrigger();
       unsubAgentCrash();
       unsubWorkspaceSandbox();
       unsubMenu();

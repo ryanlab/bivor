@@ -326,7 +326,7 @@ export function buildDeployTool(getCwd: () => string): ToolDefinition {
     execute: async (_id, params, signal) => {
       const token = process.env.VERCEL_TOKEN?.trim();
       if (!token) {
-        return fail("未配置 Vercel Token。请让用户在 设置 → 部署 里填入（vercel.com/account/tokens）。保存后需新建会话。");
+        return fail("未配置 Vercel Token。请让用户在 设置 → 部署运维（Vercel） 里填入（vercel.com/account/tokens）。保存后需新建会话。");
       }
 
       const p = params as { project?: string; dir?: string; framework?: string; prod?: boolean };

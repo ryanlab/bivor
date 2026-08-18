@@ -6,6 +6,7 @@ import { basename, projectName, samePath, shortenPath } from "@/lib/format";
 import { useDismiss } from "@/lib/use-dismiss";
 import { useT } from "@/lib/i18n";
 import { cn } from "@/lib/cn";
+import { menuPanel } from "@/lib/menu";
 
 const PROJECT_PRESETS = RUNTIME_PRESETS.filter((p) => p.workspace === "project");
 
@@ -38,7 +39,7 @@ export function PresetSwitch(): React.JSX.Element {
         <ChevronDown size={12} className="text-fg-muted" />
       </button>
       {open && (
-        <div className="dialog-in absolute left-0 top-full z-50 mt-1 w-56 rounded-xl border border-border-strong bg-bg p-1 shadow-xl">
+        <div className={cn("dialog-in absolute left-0 top-full z-50 mt-1 w-56", menuPanel)}>
           {PROJECT_PRESETS.map((p) => {
             const Icon = PRESET_META[p.id]?.icon ?? Code2;
             const hint = PRESET_META[p.id] ? t(PRESET_META[p.id].hint) : p.description;
@@ -147,45 +148,30 @@ export function ProjectListItem({
   );
 }
 
-export function ComposerStack({
-  stacked,
-  modeBar = false,
-  className,
-  children,
+/** 最近项目 + 默认项目选择面板（搜索 / 列表 / 新建或打开文件夹）。 */
+export function ProjectPickerPanel({
+  selectedPath,
+  onSelectDefault,
+  onSelectPath,
+  onCreateFolder,
+  onOpenFolder,
 }: {
-  stacked: boolean;
-  /** 把日常/编程模式挂在输入框上方，样式与下方项目条对称。 */
-  modeBar?: boolean;
-  className?: string;
-  children: React.ReactNode;
+  selectedPath?: string;
+  onSelectDefault: () => void;
+  onSelectPath: (path: string) => void;
+  onCreateFolder: () => void;
+  onOpenFolder: () => void;
 }): React.JSX.Element {
   const t = useT();
   const recentProjects = useAppStore((s) => s.recentProjects);
-  const activeProjectPath = useAppStore((s) => s.activeProjectPath);
   const defaultProjectCwd = useAppStore((s) => s.defaultProjectCwd);
-  const openProject = useAppStore((s) => s.openProject);
   const removeRecentProject = useAppStore((s) => s.removeRecentProject);
-  const selectDefaultProject = useAppStore((s) => s.selectDefaultProject);
-  const pickAndOpenProject = useAppStore((s) => s.pickAndOpenProject);
-  const appMode = useAppStore((s) => s.appMode);
-  const setAppMode = useAppStore((s) => s.setAppMode);
-  const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
-  const pickerRef = useRef<HTMLDivElement>(null);
   const searchRef = useRef<HTMLInputElement>(null);
-  useDismiss(open, pickerRef, () => setOpen(false));
 
   useEffect(() => {
-    if (!stacked) setOpen(false);
-  }, [stacked]);
-
-  useEffect(() => {
-    if (!open) {
-      setQuery("");
-      return;
-    }
     requestAnimationFrame(() => searchRef.current?.focus());
-  }, [open]);
+  }, []);
 
   const q = query.trim().toLowerCase();
   const recents = recentProjects.filter((p) => !samePath(p.path, defaultProjectCwd));
@@ -209,6 +195,168 @@ export function ComposerStack({
         );
       })
     : recents;
+
+  return (
+    <div className="flex max-h-96 flex-col overflow-hidden rounded-xl border border-border-strong bg-bg shadow-2xl">
+      <div className="shrink-0 px-3 py-2">
+        <input
+          ref={searchRef}
+          autoFocus
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder={t("composer.searchProjects")}
+          className="w-full bg-transparent py-0.5 text-xs text-fg outline-none placeholder:text-fg-muted"
+        />
+      </div>
+      <div className="min-h-0 flex-1 overflow-y-auto p-1">
+        {defaultMatches && (
+          <ProjectListItem
+            compact
+            name={defaultLabel}
+            hint={defaultProjectCwd ? shortenPath(defaultProjectCwd) : defaultHint}
+            selected={samePath(selectedPath, defaultProjectCwd)}
+            onSelect={onSelectDefault}
+          />
+        )}
+        {filtered.length > 0 && (
+          <div className="px-2 pb-0.5 pt-1.5 text-[11px] font-medium text-fg-muted">
+            {t("composer.recent")}
+          </div>
+        )}
+        {filtered.length === 0 && !defaultMatches && (
+          <div className="px-3 py-4 text-center text-xs text-fg-muted">
+            {q ? t("composer.noMatchProject") : t("composer.noRecentProject")}
+          </div>
+        )}
+        {filtered.map((p) => (
+          <ProjectListItem
+            key={p.path}
+            compact
+            name={basename(p.path)}
+            hint={shortenPath(p.path)}
+            selected={samePath(p.path, selectedPath)}
+            onSelect={() => onSelectPath(p.path)}
+            onRemove={() => removeRecentProject(p.path)}
+          />
+        ))}
+      </div>
+      <div className="grid grid-cols-2 gap-0.5 p-1">
+        <button
+          type="button"
+          onClick={onCreateFolder}
+          className="flex items-center justify-center gap-1.5 rounded-md px-2 py-1.5 text-xs text-fg-secondary transition-colors hover:bg-bg-hover"
+        >
+          <FolderPlus size={13} />
+          {t("composer.newFolder")}
+        </button>
+        <button
+          type="button"
+          onClick={onOpenFolder}
+          className="flex items-center justify-center gap-1.5 rounded-md px-2 py-1.5 text-xs text-fg-secondary transition-colors hover:bg-bg-hover"
+        >
+          <Plus size={13} />
+          {t("composer.openFolder")}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/** 表单里的只读项目选择：点击弹出与新建对话相同的项目面板。 */
+export function ProjectPickerField({
+  value,
+  onChange,
+}: {
+  value: string;
+  onChange: (path: string) => void;
+}): React.JSX.Element {
+  const t = useT();
+  const defaultProjectCwd = useAppStore((s) => s.defaultProjectCwd);
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  useDismiss(open, ref, () => setOpen(false));
+
+  const choose = (path: string): void => {
+    if (path) onChange(path);
+    setOpen(false);
+  };
+
+  return (
+    <div ref={ref} className="relative">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className={cn(
+          "flex h-9 w-full items-center gap-2 rounded-md border bg-bg-input px-3 pr-2 text-left text-[13px] outline-none transition-colors",
+          open ? "border-border-strong" : "border-border hover:border-border-strong",
+        )}
+      >
+        <span className={cn("min-w-0 flex-1 truncate", value ? "text-fg" : "text-fg-muted")}>
+          {value ? shortenPath(value) : t("schedule.pickProject")}
+        </span>
+        <Folder size={14} strokeWidth={1.7} className="shrink-0 text-fg-muted" />
+      </button>
+      {open && (
+        <div className="dialog-in absolute left-0 right-0 top-full z-50 mt-1">
+          <ProjectPickerPanel
+            selectedPath={value || undefined}
+            onSelectDefault={() => {
+              if (defaultProjectCwd) {
+                choose(defaultProjectCwd);
+                return;
+              }
+              setOpen(false);
+              void window.pi.system.defaultProjectCwd().then((cwd) => {
+                if (cwd) onChange(cwd);
+              });
+            }}
+            onSelectPath={choose}
+            onCreateFolder={() => {
+              setOpen(false);
+              void window.pi.system.createFolder().then(({ path }) => {
+                if (path) onChange(path);
+              });
+            }}
+            onOpenFolder={() => {
+              setOpen(false);
+              void window.pi.system.pickFolder().then(({ path }) => {
+                if (path) onChange(path);
+              });
+            }}
+          />
+        </div>
+      )}
+    </div>
+  );
+}
+
+export function ComposerStack({
+  stacked,
+  modeBar = false,
+  className,
+  children,
+}: {
+  stacked: boolean;
+  /** 把日常/编程模式挂在输入框上方，样式与下方项目条对称。 */
+  modeBar?: boolean;
+  className?: string;
+  children: React.ReactNode;
+}): React.JSX.Element {
+  const t = useT();
+  const activeProjectPath = useAppStore((s) => s.activeProjectPath);
+  const defaultProjectCwd = useAppStore((s) => s.defaultProjectCwd);
+  const openProject = useAppStore((s) => s.openProject);
+  const selectDefaultProject = useAppStore((s) => s.selectDefaultProject);
+  const pickAndOpenProject = useAppStore((s) => s.pickAndOpenProject);
+  const appMode = useAppStore((s) => s.appMode);
+  const setAppMode = useAppStore((s) => s.setAppMode);
+  const [open, setOpen] = useState(false);
+  const pickerRef = useRef<HTMLDivElement>(null);
+  useDismiss(open, pickerRef, () => setOpen(false));
+
+  useEffect(() => {
+    if (!stacked) setOpen(false);
+  }, [stacked]);
 
   if (!stacked && !modeBar) return <div className={className}>{children}</div>;
 
@@ -265,81 +413,28 @@ export function ComposerStack({
         </button>
       </div>
       {open && (
-        <div className="dialog-in absolute left-0 right-0 top-full z-50 mt-2 flex max-h-96 flex-col overflow-hidden rounded-xl border border-border-strong bg-bg shadow-2xl">
-          <div className="shrink-0 px-3 py-2">
-            <input
-              ref={searchRef}
-              autoFocus
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder={t("composer.searchProjects")}
-              className="w-full bg-transparent py-0.5 text-xs text-fg outline-none placeholder:text-fg-muted"
-            />
-          </div>
-          <div className="min-h-0 flex-1 overflow-y-auto p-1">
-            {defaultMatches && (
-              <ProjectListItem
-                compact
-                name={defaultLabel}
-                hint={defaultProjectCwd ? shortenPath(defaultProjectCwd) : defaultHint}
-                selected={samePath(activeProjectPath, defaultProjectCwd)}
-                onSelect={() => {
-                  void selectDefaultProject();
-                  setOpen(false);
-                }}
-              />
-            )}
-            {filtered.length > 0 && (
-              <div className="px-2 pb-0.5 pt-1.5 text-[11px] font-medium text-fg-muted">
-                {t("composer.recent")}
-              </div>
-            )}
-            {filtered.length === 0 && !defaultMatches && (
-              <div className="px-3 py-4 text-center text-xs text-fg-muted">
-                {q ? t("composer.noMatchProject") : t("composer.noRecentProject")}
-              </div>
-            )}
-            {filtered.map((p) => (
-              <ProjectListItem
-                key={p.path}
-                compact
-                name={basename(p.path)}
-                hint={shortenPath(p.path)}
-                selected={samePath(p.path, activeProjectPath)}
-                onSelect={() => {
-                  openProject(p.path);
-                  setOpen(false);
-                }}
-                onRemove={() => removeRecentProject(p.path)}
-              />
-            ))}
-          </div>
-          <div className="grid grid-cols-2 gap-0.5 p-1">
-            <button
-              type="button"
-              onClick={() => {
-                setOpen(false);
-                void window.pi.system.createFolder().then(({ path }) => {
-                  if (path) openProject(path);
-                });
-              }}
-              className="flex items-center justify-center gap-1.5 rounded-md px-2 py-1.5 text-xs text-fg-secondary transition-colors hover:bg-bg-hover"
-            >
-              <FolderPlus size={13} />
-              {t("composer.newFolder")}
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setOpen(false);
-                void pickAndOpenProject();
-              }}
-              className="flex items-center justify-center gap-1.5 rounded-md px-2 py-1.5 text-xs text-fg-secondary transition-colors hover:bg-bg-hover"
-            >
-              <Plus size={13} />
-              {t("composer.openFolder")}
-            </button>
-          </div>
+        <div className="dialog-in absolute left-0 right-0 top-full z-50 mt-2">
+          <ProjectPickerPanel
+            selectedPath={activeProjectPath}
+            onSelectDefault={() => {
+              void selectDefaultProject();
+              setOpen(false);
+            }}
+            onSelectPath={(path) => {
+              openProject(path);
+              setOpen(false);
+            }}
+            onCreateFolder={() => {
+              setOpen(false);
+              void window.pi.system.createFolder().then(({ path }) => {
+                if (path) openProject(path);
+              });
+            }}
+            onOpenFolder={() => {
+              setOpen(false);
+              void pickAndOpenProject();
+            }}
+          />
         </div>
       )}
       </div>

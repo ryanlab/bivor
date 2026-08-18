@@ -36,6 +36,7 @@ import type {
   VercelDeploymentInfo,
   VercelProjectDetail,
   VercelProjectInfo,
+  VercelTestResult,
   SandboxStatusPayload,
   UpdateCheckPayload,
 } from "@shared/protocol";
@@ -77,6 +78,13 @@ const api = {
     get: (): Promise<AppConfigPayload> => ipcRenderer.invoke(IPC.configGet),
     set: (patch: Partial<AppConfigPayload>): Promise<AppConfigPayload> =>
       ipcRenderer.invoke(IPC.configSet, patch),
+  },
+  bark: {
+    test: (opts?: {
+      deviceUrl?: string;
+      title?: string;
+      body?: string;
+    }): Promise<{ ok: boolean; error?: string }> => ipcRenderer.invoke(IPC.barkTest, opts),
   },
   resources: {
     listPackages: (cwd: string): Promise<PackageItem[]> =>
@@ -266,12 +274,12 @@ const api = {
       ipcRenderer.invoke(IPC.deploymentsProjectDetail, projectId),
     cancel: (id: string): Promise<void> => ipcRenderer.invoke(IPC.deploymentsCancel, id),
     delete: (id: string): Promise<void> => ipcRenderer.invoke(IPC.deploymentsDelete, id),
-    redeploy: (id: string, name: string, target?: "production"): Promise<VercelDeploymentInfo> =>
-      ipcRenderer.invoke(IPC.deploymentsRedeploy, id, name, target),
     promote: (projectId: string, id: string): Promise<void> =>
       ipcRenderer.invoke(IPC.deploymentsPromote, projectId, id),
     rollback: (projectId: string, id: string): Promise<void> =>
       ipcRenderer.invoke(IPC.deploymentsRollback, projectId, id),
+    test: (opts?: { token?: string; teamId?: string }): Promise<VercelTestResult> =>
+      ipcRenderer.invoke(IPC.deploymentsTest, opts),
   },
   schedule: {
     list: (): Promise<ScheduledTask[]> => ipcRenderer.invoke(IPC.scheduleList),
@@ -283,11 +291,6 @@ const api = {
       const handler = (_event: unknown, tasks: ScheduledTask[]): void => listener(tasks);
       ipcRenderer.on(IPC.scheduleChanged, handler);
       return () => ipcRenderer.removeListener(IPC.scheduleChanged, handler);
-    },
-    onTrigger: (listener: (task: ScheduledTask) => void): (() => void) => {
-      const handler = (_event: unknown, task: ScheduledTask): void => listener(task);
-      ipcRenderer.on(IPC.scheduleTrigger, handler);
-      return () => ipcRenderer.removeListener(IPC.scheduleTrigger, handler);
     },
   },
   workspaceSandbox: {

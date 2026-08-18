@@ -340,8 +340,6 @@ interface AppState {
   saveScheduledTask(task: ScheduledTask): Promise<void>;
   deleteScheduledTask(id: string): Promise<void>;
   runScheduledTaskNow(id: string): Promise<void>;
-  /** main 推送的 open-chat 型定时任务触发：打开聊天并自动发送 prompt */
-  handleScheduleTrigger(task: ScheduledTask): void;
 }
 
 // ---------- helpers ----------
@@ -1931,14 +1929,5 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   async runScheduledTaskNow(id) {
     set({ scheduledTasks: await window.pi.schedule.runNow(id) });
-  },
-
-  handleScheduleTrigger(task) {
-    void get().openChat({
-      cwd: task.cwd,
-      kind: task.kind,
-      presetId: task.presetId,
-      initialPrompt: task.prompt,
-    });
   },
 }));

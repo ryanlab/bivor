@@ -15,6 +15,7 @@ import { ModelPicker } from "@/components/ModelPicker";
 import { ComposerStack, PresetSwitch, ProjectListItem } from "@/components/ComposerStack";
 import { basename, samePath, shortenPath } from "@/lib/format";
 import { cn } from "@/lib/cn";
+import { menuPanel } from "@/lib/menu";
 import { useT, type Translator } from "@/lib/i18n";
 import logo from "@/assets/logo.png";
 
@@ -103,7 +104,7 @@ function WorkLocationPicker({
         <ChevronDown size={12} className="text-fg-muted" />
       </button>
       {open && (
-        <div className="dialog-in absolute left-0 top-full z-50 mt-1 w-56 rounded-xl border border-border-strong bg-bg p-1 shadow-xl">
+        <div className={cn("dialog-in absolute left-0 top-full z-50 mt-1 w-56", menuPanel)}>
           <div className="px-2.5 pb-1 pt-1.5 text-[10.5px] font-medium text-fg-muted">{t("welcome.workLocation")}</div>
           {options.map((o) => (
             <button

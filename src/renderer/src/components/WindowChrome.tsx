@@ -4,6 +4,7 @@ import { TITLEBAR_HEIGHT } from "@shared/titlebar";
 import { getRuntimePreset } from "@shared/runtime-presets";
 import { useAppStore, WORKSPACE_TERM_ID } from "@/stores/app-store";
 import { cn } from "@/lib/cn";
+import { menuItemClass, menuPanel } from "@/lib/menu";
 import { useDismiss } from "@/lib/use-dismiss";
 import { useT } from "@/lib/i18n";
 import {
@@ -120,7 +121,7 @@ function TimeFilterButton(): React.JSX.Element {
         )}
       </ChromeButton>
       {open && (
-        <div className="dialog-in absolute left-0 top-full z-50 mt-1 w-44 rounded-xl border border-border-strong bg-bg p-1 shadow-xl">
+        <div className={cn("dialog-in absolute left-0 top-full z-50 mt-1 w-44", menuPanel)}>
           <div className="px-2.5 pb-1 pt-1.5 text-[11px] text-fg-muted">{t("window.filterTime")}</div>
           {SESSION_TIME_FILTERS.map((id) => {
             const selected = id === filter;
@@ -132,10 +133,7 @@ function TimeFilterButton(): React.JSX.Element {
                   setFilter(id);
                   setOpen(false);
                 }}
-                className={cn(
-                  "flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-[13px] transition-colors",
-                  selected ? "bg-bg-hover text-fg" : "text-fg-secondary hover:bg-bg-hover hover:text-fg",
-                )}
+                className={menuItemClass(selected, "items-center gap-2 px-2.5 py-1.5")}
               >
                 <span className="min-w-0 flex-1">{t(TIME_FILTER_LABEL[id])}</span>
                 {selected && <Check size={14} strokeWidth={2.2} className="shrink-0 text-success" />}

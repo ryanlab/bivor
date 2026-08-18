@@ -16,6 +16,7 @@ import {
   Palette,
   Rocket,
   Scale,
+  Smartphone,
   Sun,
   Trash2,
   X,
@@ -510,10 +511,12 @@ function WebTab(): React.JSX.Element {
 
 function DeployTab(): React.JSX.Element {
   const t = useT();
+  const setSettingsOpen = useAppStore((s) => s.setSettingsOpen);
   const [token, setToken] = useState("");
   const [teamId, setTeamId] = useState("");
   const [loaded, setLoaded] = useState(false);
-  const [saved, setSaved] = useState(false);
+  const [testing, setTesting] = useState(false);
+  const [testMsg, setTestMsg] = useState<{ ok: boolean; text: string } | null>(null);
 
   useEffect(() => {
     void window.pi.config.get().then((c) => {
@@ -528,21 +531,90 @@ function DeployTab(): React.JSX.Element {
       <div>
         <div className="text-sm font-medium">{t("settings.deployTitle")}</div>
         <p className="pt-1 text-xs leading-relaxed text-fg-muted">{t("settings.deployIntro")}</p>
+        <div className="flex flex-wrap gap-x-3 gap-y-1 pt-1.5 text-[11px]">
+          <a
+            href="https://vercel.com"
+            target="_blank"
+            rel="noreferrer"
+            className="inline-flex items-center gap-1 text-accent hover:underline"
+          >
+            {t("settings.vercelSite")}
+            <ExternalLink size={10} />
+          </a>
+        </div>
       </div>
       <div className="space-y-1.5">
         <label className="text-xs font-medium text-fg-secondary">Vercel Token</label>
-        <input
-          type="password"
-          value={token}
-          onChange={(e) => {
-            setToken(e.target.value);
-            setSaved(false);
-          }}
-          placeholder="vercel_…"
-          disabled={!loaded}
-          className="w-full rounded-lg border border-border bg-bg-input px-3 py-2 font-mono text-xs outline-none focus:border-accent/60"
-        />
-        <p className="text-[11px] text-fg-muted">{t("settings.vercelHint")}</p>
+        <div className="flex h-9 items-stretch gap-2">
+          <input
+            type="password"
+            value={token}
+            onChange={(e) => {
+              setToken(e.target.value);
+              setTestMsg(null);
+            }}
+            placeholder="vercel_…"
+            disabled={!loaded}
+            className="h-full min-w-0 flex-1 rounded-lg border border-border bg-bg-input px-3 font-mono text-xs outline-none focus:border-accent/60"
+          />
+          <button
+            type="button"
+            disabled={!loaded || testing || !token.trim()}
+            onClick={() => {
+              setTesting(true);
+              setTestMsg(null);
+              void window.pi.deployments
+                .test({ token: token.trim(), teamId: teamId.trim() })
+                .then((r) => {
+                  if (r.ok) {
+                    const who = [r.username, r.teamName].filter(Boolean).join(" · ");
+                    setTestMsg({
+                      ok: true,
+                      text: who ? t("settings.vercelVerified", { who }) : t("common.success"),
+                    });
+                    return;
+                  }
+                  setTestMsg({
+                    ok: false,
+                    text:
+                      r.error === "missing"
+                        ? t("settings.vercelMissing")
+                        : (r.error ?? t("common.failed")),
+                  });
+                })
+                .finally(() => setTesting(false));
+            }}
+            className={cn(
+              "relative inline-flex h-full shrink-0 items-center justify-center rounded-lg border px-3 text-xs font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-40",
+              testMsg?.ok
+                ? "border-success/50 text-success"
+                : "border-fg-muted text-fg-secondary hover:border-fg-secondary hover:bg-bg-hover hover:text-fg",
+            )}
+          >
+            <span className="invisible whitespace-nowrap" aria-hidden>
+              {t("settings.vercelTesting")}
+            </span>
+            <span className="absolute inset-0 flex items-center justify-center">
+              {testing
+                ? t("settings.vercelTesting")
+                : testMsg?.ok
+                  ? t("common.success")
+                  : t("settings.vercelTest")}
+            </span>
+          </button>
+        </div>
+        <p className="text-[11px] text-fg-muted">
+          {t("settings.vercelHint", { url: "\0" }).split("\0")[0]}
+          <a
+            href="https://vercel.com/account/tokens"
+            target="_blank"
+            rel="noreferrer"
+            className="text-accent hover:underline"
+          >
+            vercel.com/account/tokens
+          </a>
+          {t("settings.vercelHint", { url: "\0" }).split("\0")[1]}
+        </p>
       </div>
       <div className="space-y-1.5">
         <label className="text-xs font-medium text-fg-secondary">{t("settings.teamId")}</label>
@@ -551,7 +623,7 @@ function DeployTab(): React.JSX.Element {
           value={teamId}
           onChange={(e) => {
             setTeamId(e.target.value);
-            setSaved(false);
+            setTestMsg(null);
           }}
           placeholder="team_…"
           disabled={!loaded}
@@ -569,21 +641,139 @@ function DeployTab(): React.JSX.Element {
                 vercelTeamId: teamId.trim() || undefined,
               })
               .then(() => {
-                setSaved(true);
-                setTimeout(() => setSaved(false), 2500);
+                setSettingsOpen(false);
               });
           }}
           className="rounded-lg bg-accent px-3 py-1.5 text-xs font-medium text-accent-fg hover:bg-accent-hover"
         >
           {t("common.save")}
         </button>
-        {saved && (
-          <span className="flex items-center gap-1 text-xs text-success">
-            <Check size={12} />
-            {t("common.saved")}
-          </span>
-        )}
       </div>
+      {testMsg && (
+        <p className={cn("text-xs", testMsg.ok ? "text-success" : "text-danger")}>{testMsg.text}</p>
+      )}
+    </div>
+  );
+}
+
+function BarkTab(): React.JSX.Element {
+  const t = useT();
+  const setSettingsOpen = useAppStore((s) => s.setSettingsOpen);
+  const [url, setUrl] = useState("");
+  const [loaded, setLoaded] = useState(false);
+  const [testing, setTesting] = useState(false);
+  const [testMsg, setTestMsg] = useState<{ ok: boolean; text: string } | null>(null);
+
+  useEffect(() => {
+    void window.pi.config.get().then((c) => {
+      setUrl(c.barkDeviceUrl ?? "");
+      setLoaded(true);
+    });
+  }, []);
+
+  return (
+    <div className="space-y-4">
+      <div>
+        <div className="text-sm font-medium">{t("settings.barkTitle")}</div>
+        <p className="pt-1 text-xs leading-relaxed text-fg-muted">{t("settings.barkIntro")}</p>
+        <div className="flex flex-wrap gap-x-3 gap-y-1 pt-1.5 text-[11px]">
+          <a
+            href="https://bark.day.app"
+            target="_blank"
+            rel="noreferrer"
+            className="inline-flex items-center gap-1 text-accent hover:underline"
+          >
+            {t("settings.barkGetApp")}
+            <ExternalLink size={10} />
+          </a>
+          <a
+            href="https://github.com/Finb/Bark"
+            target="_blank"
+            rel="noreferrer"
+            className="inline-flex items-center gap-1 text-accent hover:underline"
+          >
+            {t("settings.barkDocs")}
+            <ExternalLink size={10} />
+          </a>
+        </div>
+      </div>
+      <div className="space-y-1.5">
+        <label className="text-xs font-medium text-fg-secondary">{t("settings.barkUrl")}</label>
+        <div className="flex h-9 items-stretch gap-2">
+          <input
+            type="text"
+            value={url}
+            onChange={(e) => {
+              setUrl(e.target.value);
+              setTestMsg(null);
+            }}
+            placeholder="https://api.day.app/yourkey/"
+            disabled={!loaded}
+            className="h-full min-w-0 flex-1 rounded-lg border border-border bg-bg-input px-3 font-mono text-xs outline-none focus:border-accent/60"
+          />
+          <button
+            type="button"
+            disabled={!loaded || testing || !url.trim()}
+            onClick={() => {
+              setTesting(true);
+              setTestMsg(null);
+              void window.pi.bark
+                .test({
+                  deviceUrl: url.trim(),
+                  title: t("notify.barkTestTitle"),
+                  body: t("notify.barkTestBody"),
+                })
+                .then((r) => {
+                  if (r.ok) {
+                    setTestMsg({ ok: true, text: t("common.success") });
+                    setTimeout(() => setTestMsg(null), 2500);
+                    return;
+                  }
+                  setTestMsg({
+                    ok: false,
+                    text:
+                      r.error === "missing"
+                        ? t("settings.barkMissing")
+                        : (r.error ?? t("common.failed")),
+                  });
+                })
+                .finally(() => setTesting(false));
+            }}
+            className={cn(
+              "relative inline-flex h-full shrink-0 items-center justify-center rounded-lg border px-3 text-xs font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-40",
+              testMsg?.ok
+                ? "border-success/50 text-success"
+                : "border-fg-muted text-fg-secondary hover:border-fg-secondary hover:bg-bg-hover hover:text-fg",
+            )}
+          >
+            <span className="invisible whitespace-nowrap" aria-hidden>
+              {t("settings.barkTesting")}
+            </span>
+            <span className="absolute inset-0 flex items-center justify-center">
+              {testing
+                ? t("settings.barkTesting")
+                : testMsg?.ok
+                  ? t("common.success")
+                  : t("settings.barkTest")}
+            </span>
+          </button>
+        </div>
+        <p className="whitespace-pre-line text-[11px] text-fg-muted">{t("settings.barkHint")}</p>
+      </div>
+      <div className="flex flex-wrap items-center gap-2">
+        <button
+          type="button"
+          onClick={() => {
+            void window.pi.config.set({ barkDeviceUrl: url.trim() || undefined }).then(() => {
+              setSettingsOpen(false);
+            });
+          }}
+          className="rounded-lg bg-accent px-3 py-1.5 text-xs font-medium text-accent-fg hover:bg-accent-hover"
+        >
+          {t("common.save")}
+        </button>
+      </div>
+      {testMsg && !testMsg.ok && <p className="text-xs text-danger">{testMsg.text}</p>}
     </div>
   );
 }
@@ -842,7 +1032,7 @@ function AboutPiTab(): React.JSX.Element {
 
 // ---------- Dialog ----------
 
-const TAB_IDS = ["auth", "sandbox", "web", "deploy", "appearance", "about", "pi"] as const;
+const TAB_IDS = ["auth", "sandbox", "web", "deploy", "bark", "appearance", "about", "pi"] as const;
 type TabId = (typeof TAB_IDS)[number];
 
 export function SettingsDialog(): React.JSX.Element | null {
@@ -862,6 +1052,7 @@ export function SettingsDialog(): React.JSX.Element | null {
     { id: "sandbox", label: t("settings.tabs.sandbox"), icon: <MonitorPlay size={14} /> },
     { id: "web", label: t("settings.tabs.web"), icon: <Globe size={14} /> },
     { id: "deploy", label: t("settings.tabs.deploy"), icon: <Rocket size={14} /> },
+    { id: "bark", label: t("settings.tabs.bark"), icon: <Smartphone size={14} /> },
     { id: "appearance", label: t("settings.tabs.appearance"), icon: <Palette size={14} /> },
     { id: "pi", label: t("settings.tabs.pi"), icon: <Bot size={14} /> },
     { id: "about", label: t("settings.tabs.about"), icon: <Info size={14} /> },
@@ -875,11 +1066,11 @@ export function SettingsDialog(): React.JSX.Element | null {
       onClick={() => setOpen(false)}
     >
       <div
-        className="dialog-in flex h-[480px] max-h-[80vh] w-[640px] overflow-hidden rounded-2xl border border-border-strong bg-bg-secondary shadow-2xl"
+        className="dialog-in flex h-[480px] max-h-[80vh] w-[700px] overflow-hidden rounded-2xl border border-border-strong bg-bg-secondary shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Left nav */}
-        <div className="flex w-40 shrink-0 flex-col border-r border-border bg-bg-tertiary/50 p-2">
+        <div className="flex w-52 shrink-0 flex-col border-r border-border bg-bg-tertiary/50 p-2">
           <div className="px-2.5 pb-2 pt-1.5 text-[13px] font-semibold">{t("settings.title")}</div>
           {tabs.map((item) => (
             <button
@@ -915,6 +1106,7 @@ export function SettingsDialog(): React.JSX.Element | null {
             {tab === "sandbox" && <SandboxTab />}
             {tab === "web" && <WebTab />}
             {tab === "deploy" && <DeployTab />}
+            {tab === "bark" && <BarkTab />}
             {tab === "appearance" && <AppearanceTab />}
             {tab === "about" && <AboutTab />}
             {tab === "pi" && <AboutPiTab />}

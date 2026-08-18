@@ -264,12 +264,18 @@ export interface AppConfigPayload {
   vercelToken?: string;
   /** 可选。Team 账号部署时需要，来自 Vercel Team Settings。 */
   vercelTeamId?: string;
+  /** Bark 设备推送地址（App 里复制的测试 URL，或设备 Key）。 */
+  barkDeviceUrl?: string;
   harnessPresets?: HarnessPreset[];
   /** Last selected workspace: daily chat vs coding agent. */
   appMode?: ChatKind;
   /** UI + agent reply language. */
   locale?: "zh" | "en";
 }
+
+export type VercelTestResult =
+  | { ok: true; username?: string; teamName?: string }
+  | { ok: false; error: string };
 
 // ---------- 部署运维（Vercel） ----------
 
@@ -338,18 +344,54 @@ export interface VercelProjectDetail {
 
 // ---------- 定时任务 ----------
 
+export const INTERVAL_UNITS = [
+  "seconds",
+  "minutes",
+  "hours",
+  "weeks",
+  "months",
+  "quarters",
+  "years",
+] as const;
+export type IntervalUnit = (typeof INTERVAL_UNITS)[number];
+
+export function isIntervalUnit(v: unknown): v is IntervalUnit {
+  return typeof v === "string" && (INTERVAL_UNITS as readonly string[]).includes(v);
+}
+
+/** 兼容旧数据：只存了 everyMinutes（小时在 UI 里写成 minutes*60）。 */
+export function normalizeInterval(schedule: {
+  every?: number;
+  unit?: string;
+  everyMinutes?: number;
+}): { every: number; unit: IntervalUnit } {
+  if (isIntervalUnit(schedule.unit) && schedule.every != null) {
+    return {
+      every: Math.max(1, Math.round(Number(schedule.every)) || 1),
+      unit: schedule.unit,
+    };
+  }
+  const minutes = Math.max(1, Math.round(Number(schedule.everyMinutes)) || 60);
+  if (minutes >= 60 && minutes % 60 === 0) {
+    return { every: minutes / 60, unit: "hours" };
+  }
+  return { every: minutes, unit: "minutes" };
+}
+
 export type TaskSchedule =
-  | { type: "interval"; everyMinutes: number }
+  | { type: "interval"; every: number; unit: IntervalUnit }
   | { type: "daily"; time: string } // "HH:mm"
-  | { type: "weekly"; days: number[]; time: string }; // days: 0(周日)-6(周六)
+  | { type: "weekly"; days: number[]; time: string } // days: 0(周日)-6(周六)
+  | { type: "biweekly"; days: number[]; time: string; anchor: string } // anchor: "YYYY-MM-DD"
+  | { type: "monthly"; day: number; time: string } // day: 1-31，超出当月天数则用月末
+  | { type: "yearly"; month: number; day: number; time: string } // month: 1-12
+  | { type: "once"; at: string }; // 本地时间 "YYYY-MM-DDTHH:mm"
 
 export interface ScheduledTaskRunResult {
   status: "ok" | "error";
   finishedAt: number;
   sessionFile?: string;
   error?: string;
-  /** open-chat 任务在无窗口时降级为后台执行 */
-  degradedToBackground?: boolean;
 }
 
 export interface ScheduledTask {
@@ -362,14 +404,22 @@ export interface ScheduledTask {
   presetId?: string;
   model?: { provider: string; modelId: string };
   schedule: TaskSchedule;
-  /** background = 静默后台跑完并通知；open-chat = 到点自动打开聊天 */
-  runMode: "background" | "open-chat";
+  /** 一律后台静默执行（保留字段以兼容旧数据） */
+  runMode?: "background" | "open-chat";
+  /** 完成后通过 Bark 推送到手机 */
+  barkPush?: boolean;
   enabled: boolean;
   /** 下次触发时间（epoch ms），由调度器计算 */
   nextRunAt?: number;
+  /** 生效开始日（YYYY-MM-DD），缺省表示立即生效 */
+  effectiveFrom?: string;
+  /** 生效结束日（YYYY-MM-DD），缺省表示始终有效 */
+  effectiveTo?: string;
   /** 当前是否有一次 run 在执行 */
   running?: boolean;
   lastRun?: ScheduledTaskRunResult;
+  /** 后台执行历史（新→旧）。lastRun 始终等于 runs[0]。 */
+  runs?: ScheduledTaskRunResult[];
 }
 
 // ---------- Agent 运行状况监控 ----------
@@ -783,6 +833,7 @@ export const IPC = {
   updatesCheck: "updates:check",
   configGet: "config:get",
   configSet: "config:set",
+  barkTest: "bark:test",
   packagesList: "resources:packagesList",
   packagesInstall: "resources:packagesInstall",
   packagesRemove: "resources:packagesRemove",
@@ -855,9 +906,9 @@ export const IPC = {
   deploymentsProjectDetail: "deployments:projectDetail",
   deploymentsCancel: "deployments:cancel",
   deploymentsDelete: "deployments:delete",
-  deploymentsRedeploy: "deployments:redeploy",
   deploymentsPromote: "deployments:promote",
   deploymentsRollback: "deployments:rollback",
+  deploymentsTest: "deployments:test",
   // agent 运行状况监控
   monitorSnapshot: "monitor:snapshot",
   monitorKill: "monitor:kill",
@@ -868,7 +919,6 @@ export const IPC = {
   scheduleDelete: "schedule:delete",
   scheduleRunNow: "schedule:runNow",
   scheduleChanged: "schedule:changed", // main -> renderer push
-  scheduleTrigger: "schedule:trigger", // main -> renderer push (open-chat 型触发)
   // 欢迎页工作区云端 VM（不依赖会话 host）
   workspaceSandboxGet: "workspaceSandbox:get",
   workspaceSandboxCreate: "workspaceSandbox:create",
