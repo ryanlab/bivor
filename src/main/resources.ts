@@ -2,13 +2,16 @@
  * Resource management: pi packages (npm/git plugins), skills, and MCP config.
  * Shares pi's own settings/agent-dir storage so changes are visible to the CLI.
  */
+import { spawn } from "node:child_process";
 import {
   existsSync,
+  cpSync,
   mkdirSync,
   readdirSync,
   readFileSync,
   realpathSync,
   rmSync,
+  statSync,
   writeFileSync,
 } from "node:fs";
 import { basename, extname, join, resolve, sep } from "node:path";
@@ -16,7 +19,7 @@ import type { WebContents } from "electron";
 import {
   DefaultPackageManager,
   getAgentDir,
-  loadSkills,
+  loadSkillsFromDir,
   SettingsManager,
 } from "@earendil-works/pi-coding-agent";
 import {
@@ -50,7 +53,21 @@ function makePackageManager(cwd: string, sender?: WebContents): DefaultPackageMa
 }
 
 export function listPackages(cwd: string): PackageItem[] {
-  return makePackageManager(cwd).listConfiguredPackages();
+  return makePackageManager(cwd).listConfiguredPackages().map((pkg) => ({
+    ...pkg,
+    version: readInstalledVersion(pkg.installedPath),
+  }));
+}
+
+function readInstalledVersion(installedPath?: string): string | undefined {
+  if (!installedPath || !existsSync(installedPath)) return undefined;
+  try {
+    const raw = readFileSync(join(installedPath, "package.json"), "utf8");
+    const version = (JSON.parse(raw) as { version?: unknown }).version;
+    return typeof version === "string" && version.trim() ? version.trim() : undefined;
+  } catch {
+    return undefined;
+  }
 }
 
 export async function installPackage(
@@ -71,8 +88,26 @@ export async function removePackage(
   await makePackageManager(cwd, sender).removeAndPersist(source, { local });
 }
 
-export async function updatePackages(cwd: string, sender: WebContents): Promise<void> {
-  await makePackageManager(cwd, sender).update();
+export async function updatePackages(
+  cwd: string,
+  sender: WebContents,
+  source?: string,
+): Promise<void> {
+  await makePackageManager(cwd, sender).update(source);
+}
+
+export async function checkPackageUpdates(cwd: string): Promise<
+  Array<{ source: string; scope: "user" | "project" }>
+> {
+  try {
+    const updates = await makePackageManager(cwd).checkForAvailableUpdates();
+    return updates.map((u) => ({
+      source: u.source,
+      scope: u.scope === "project" ? "project" : "user",
+    }));
+  } catch {
+    return [];
+  }
 }
 
 // ---------- Path safety ----------
@@ -99,6 +134,13 @@ function editableSkillRoots(cwd: string): string[] {
   return [join(getAgentDir(), "skills"), join(cwd, ".pi", "skills")];
 }
 
+function skillRoots(cwd: string): Array<{ dir: string; scope: "user" | "project" }> {
+  return [
+    { dir: join(getAgentDir(), "skills"), scope: "user" },
+    { dir: join(cwd, ".pi", "skills"), scope: "project" },
+  ];
+}
+
 function assertEditableSkill(cwd: string, filePath: string): string {
   const rp = realOrResolve(filePath);
   if (extname(rp) !== ".md") throw new Error("非法技能路径（必须是 .md 文件）");
@@ -121,19 +163,26 @@ function assertReadableSkill(cwd: string, filePath: string): string {
 // ---------- Skills ----------
 
 export function listSkills(cwd: string): SkillItem[] {
-  const { skills } = loadSkills({
-    cwd,
-    agentDir: getAgentDir(),
-    skillPaths: [],
-    includeDefaults: true,
-  });
-  return skills.map((s) => ({
-    name: s.name,
-    description: s.description,
-    filePath: s.filePath,
-    baseDir: s.baseDir,
-    source: s.sourceInfo?.source ?? "",
-  }));
+  const out: SkillItem[] = [];
+  const seen = new Set<string>();
+  for (const { dir, scope } of skillRoots(cwd)) {
+    if (!existsSync(dir)) continue;
+    const { skills } = loadSkillsFromDir({ dir, source: scope });
+    for (const s of skills) {
+      const key = realOrResolve(s.filePath);
+      if (seen.has(key)) continue;
+      seen.add(key);
+      out.push({
+        name: s.name,
+        description: s.description,
+        filePath: s.filePath,
+        baseDir: s.baseDir,
+        source: s.sourceInfo?.source ?? "",
+        scope,
+      });
+    }
+  }
+  return out;
 }
 
 export function readSkill(cwd: string, filePath: string): string {
@@ -190,6 +239,234 @@ export function deleteSkill(cwd: string, filePath: string): void {
     throw new Error("技能目录超出允许范围");
   }
   rmSync(dir, { recursive: true, force: true });
+}
+
+function findSkillDirs(root: string): string[] {
+  const rp = realOrResolve(root);
+  let st;
+  try {
+    st = statSync(rp);
+  } catch {
+    throw new Error("路径不存在");
+  }
+  if (st.isFile()) {
+    if (basename(rp) !== "SKILL.md") throw new Error("请选择 SKILL.md 或技能文件夹");
+    return [resolve(rp, "..")];
+  }
+  if (existsSync(join(rp, "SKILL.md"))) return [rp];
+  const found: string[] = [];
+  const scan = (dir: string, depth: number): void => {
+    if (depth > 3) return;
+    let entries;
+    try {
+      entries = readdirSync(dir, { withFileTypes: true });
+    } catch {
+      return;
+    }
+    for (const ent of entries) {
+      if (!ent.isDirectory() || ent.name.startsWith(".")) continue;
+      const p = join(dir, ent.name);
+      if (existsSync(join(p, "SKILL.md"))) found.push(p);
+      else scan(p, depth + 1);
+    }
+  };
+  scan(rp, 0);
+  return found;
+}
+
+export function importSkill(
+  scope: "user" | "project",
+  cwd: string,
+  fromPath: string,
+): string[] {
+  const dirs = findSkillDirs(fromPath);
+  if (dirs.length === 0) throw new Error("未找到 SKILL.md");
+  const destRoot =
+    scope === "user" ? join(getAgentDir(), "skills") : join(cwd, ".pi", "skills");
+  mkdirSync(destRoot, { recursive: true });
+  const destRootR = realOrResolve(destRoot);
+  const imported: string[] = [];
+  for (const dir of dirs) {
+    const src = realOrResolve(dir);
+    if (within(src, destRootR) || src === destRootR) {
+      throw new Error("该文件夹已在技能目录中");
+    }
+    const slug = basename(src)
+      .toLowerCase()
+      .replace(/[^a-z0-9\u4e00-\u9fff]+/g, "-")
+      .replace(/^-+|-+$/g, "");
+    if (!slug) throw new Error("无效的技能名称");
+    const dest = join(destRoot, slug);
+    if (existsSync(dest)) throw new Error(`技能 ${slug} 已存在`);
+    cpSync(src, dest, { recursive: true });
+    imported.push(join(dest, "SKILL.md"));
+  }
+  return imported;
+}
+
+const SKILL_INSTALL_TIMEOUT_MS = 5 * 60 * 1000;
+
+function shQuote(value: string): string {
+  return `'${value.replace(/'/g, `'\\''`)}'`;
+}
+
+function tokenizeArgs(input: string): string[] {
+  const out: string[] = [];
+  const re = /"([^"]*)"|'([^']*)'|(\S+)/g;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(input))) out.push(m[1] ?? m[2] ?? m[3] ?? "");
+  return out.filter(Boolean);
+}
+
+function stripAnsi(text: string): string {
+  return text.replace(/\x1B\[[0-9;]*[mK]/g, "");
+}
+
+export function parseSkillInstallInput(raw: string): { source: string; skills: string[] } {
+  const line = raw.trim().split(/\r?\n/, 1)[0]?.trim() ?? "";
+  if (!line) throw new Error("请填写技能来源");
+  const stripped = line
+    .replace(/^(?:npx\s+(?:--yes\s+)?)?skills\s+add\s+/i, "")
+    .trim();
+  const tokens = tokenizeArgs(stripped);
+  const skills: string[] = [];
+  const rest: string[] = [];
+  for (let i = 0; i < tokens.length; i++) {
+    const tok = tokens[i];
+    if (tok === "--skill" || tok === "-s") {
+      const name = tokens[++i];
+      if (name) skills.push(name);
+      continue;
+    }
+    if (tok.startsWith("--skill=")) {
+      skills.push(tok.slice("--skill=".length));
+      continue;
+    }
+    if (
+      tok === "-g" ||
+      tok === "--global" ||
+      tok === "-y" ||
+      tok === "--yes" ||
+      tok === "--copy" ||
+      tok === "--all" ||
+      tok === "-l" ||
+      tok === "--list"
+    ) {
+      continue;
+    }
+    if (tok === "-a" || tok === "--agent") {
+      i += 1;
+      continue;
+    }
+    if (tok.startsWith("-")) continue;
+    rest.push(tok);
+  }
+  if (rest.length !== 1) throw new Error("无效的技能来源");
+  const source = rest[0];
+  if (
+    /[\n\r;|&$`]/.test(source) ||
+    source.length > 500 ||
+    !(
+      /^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+(?:\/[A-Za-z0-9_./-]+)?$/.test(source) ||
+      /^https?:\/\//i.test(source) ||
+      /^git@/i.test(source) ||
+      /^ssh:\/\//i.test(source) ||
+      source.startsWith("./") ||
+      source.startsWith("../") ||
+      source.startsWith("/")
+    )
+  ) {
+    throw new Error("无效的技能来源");
+  }
+  for (const name of skills) {
+    if (!/^[\w.*?-]+$/.test(name) || name.length > 120) {
+      throw new Error(`无效的技能名称：${name}`);
+    }
+  }
+  return { source, skills };
+}
+
+function runSkillsCli(
+  args: string[],
+  cwd: string,
+  onLine: (line: string) => void,
+): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const isWin = process.platform === "win32";
+    const child = isWin
+      ? spawn(process.env.ComSpec || "cmd.exe", ["/d", "/s", "/c", args.map((a) => `"${a.replace(/"/g, '""')}"`).join(" ")], {
+          cwd,
+          windowsHide: true,
+          env: { ...process.env },
+        })
+      : spawn(process.env.SHELL || "/bin/zsh", ["-lc", `cd ${shQuote(cwd)} && ${args.map(shQuote).join(" ")}`], {
+          cwd,
+          env: { ...process.env },
+        });
+
+    let out = "";
+    const take = (chunk: Buffer | string): void => {
+      const text = chunk.toString();
+      out += text;
+      if (out.length > 20_000) out = out.slice(-12_000);
+      const lines = stripAnsi(text)
+        .split(/\r?\n|\r/)
+        .map((l) => l.trim())
+        .filter(Boolean);
+      for (const line of lines) onLine(line);
+    };
+    child.stdout?.on("data", take);
+    child.stderr?.on("data", take);
+
+    const timer = setTimeout(() => {
+      child.kill();
+      reject(new Error("安装超时"));
+    }, SKILL_INSTALL_TIMEOUT_MS);
+
+    child.on("error", (err) => {
+      clearTimeout(timer);
+      reject(err);
+    });
+    child.on("close", (code) => {
+      clearTimeout(timer);
+      if (code === 0) {
+        resolve();
+        return;
+      }
+      const detail = stripAnsi(out).trim().split(/\r?\n/).slice(-8).join("\n");
+      reject(new Error(detail || `技能安装失败 (exit ${code})`));
+    });
+  });
+}
+
+/** Install community skills via `npx skills add`, targeting the pi agent paths. */
+export async function installSkillSource(
+  cwd: string,
+  raw: string,
+  local: boolean,
+  sender: WebContents,
+): Promise<void> {
+  const { source, skills } = parseSkillInstallInput(raw);
+  const names = skills.length > 0 ? skills : ["*"];
+  if (local) mkdirSync(join(cwd, ".pi", "skills"), { recursive: true });
+  const args = [
+    "npx",
+    "--yes",
+    "skills",
+    "add",
+    source,
+    "-a",
+    "pi",
+    "-y",
+    "--copy",
+    ...(!local ? ["-g"] : []),
+    ...names.flatMap((name) => ["--skill", name]),
+  ];
+  const emit = (message: string): void => {
+    if (!sender.isDestroyed()) sender.send(IPC.skillsProgress, message);
+  };
+  emit(`npx skills add ${source}…`);
+  await runSkillsCli(args, cwd, emit);
 }
 
 // ---------- Prompt templates ----------

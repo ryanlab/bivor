@@ -604,6 +604,12 @@ export interface PackageItem {
   scope: "user" | "project";
   installedPath?: string;
   filtered: boolean;
+  version?: string;
+}
+
+export interface PackageUpdateInfo {
+  source: string;
+  scope: "user" | "project";
 }
 
 export interface SkillItem {
@@ -612,6 +618,7 @@ export interface SkillItem {
   filePath: string;
   baseDir: string;
   source: string;
+  scope: "user" | "project";
 }
 
 export interface PromptItem {
@@ -859,11 +866,15 @@ export const IPC = {
   packagesInstall: "resources:packagesInstall",
   packagesRemove: "resources:packagesRemove",
   packagesUpdate: "resources:packagesUpdate",
+  packagesCheckUpdates: "resources:packagesCheckUpdates",
   packagesProgress: "resources:packagesProgress",
   skillsList: "resources:skillsList",
   skillsRead: "resources:skillsRead",
   skillsSave: "resources:skillsSave",
   skillsCreate: "resources:skillsCreate",
+  skillsInstall: "resources:skillsInstall",
+  skillsImport: "resources:skillsImport",
+  skillsProgress: "resources:skillsProgress",
   skillsDelete: "resources:skillsDelete",
   mcpRead: "resources:mcpRead",
   mcpSave: "resources:mcpSave",

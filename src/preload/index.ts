@@ -22,6 +22,7 @@ import type {
   ModelInfo,
   PackageItem,
   PackageProgressPayload,
+  PackageUpdateInfo,
   ProjectFileRead,
   ProviderInfo,
   SessionListItem,
@@ -110,7 +111,10 @@ const api = {
       ipcRenderer.invoke(IPC.packagesInstall, cwd, source, local),
     removePackage: (cwd: string, source: string, local: boolean): Promise<void> =>
       ipcRenderer.invoke(IPC.packagesRemove, cwd, source, local),
-    updatePackages: (cwd: string): Promise<void> => ipcRenderer.invoke(IPC.packagesUpdate, cwd),
+    updatePackages: (cwd: string, source?: string): Promise<void> =>
+      ipcRenderer.invoke(IPC.packagesUpdate, cwd, source),
+    checkPackageUpdates: (cwd: string): Promise<PackageUpdateInfo[]> =>
+      ipcRenderer.invoke(IPC.packagesCheckUpdates, cwd),
     onPackageProgress: (listener: (event: PackageProgressPayload) => void): (() => void) => {
       const handler = (_e: unknown, payload: PackageProgressPayload): void => listener(payload);
       ipcRenderer.on(IPC.packagesProgress, handler);
@@ -127,6 +131,18 @@ const api = {
       name: string,
       description: string,
     ): Promise<string> => ipcRenderer.invoke(IPC.skillsCreate, scope, cwd, name, description),
+    installSkill: (cwd: string, source: string, local: boolean): Promise<void> =>
+      ipcRenderer.invoke(IPC.skillsInstall, cwd, source, local),
+    importSkill: (
+      scope: "user" | "project",
+      cwd: string,
+      fromPath: string,
+    ): Promise<string[]> => ipcRenderer.invoke(IPC.skillsImport, scope, cwd, fromPath),
+    onSkillProgress: (listener: (message: string) => void): (() => void) => {
+      const handler = (_e: unknown, message: string): void => listener(message);
+      ipcRenderer.on(IPC.skillsProgress, handler);
+      return () => ipcRenderer.removeListener(IPC.skillsProgress, handler);
+    },
     deleteSkill: (cwd: string, path: string): Promise<void> =>
       ipcRenderer.invoke(IPC.skillsDelete, cwd, path),
     listPrompts: (cwd: string): Promise<PromptItem[]> => ipcRenderer.invoke(IPC.promptsList, cwd),
@@ -361,7 +377,8 @@ const api = {
     },
   },
   system: {
-    pickFolder: (): Promise<{ path: string | null }> => ipcRenderer.invoke(IPC.pickFolder),
+    pickFolder: (opts?: { title?: string }): Promise<{ path: string | null }> =>
+      ipcRenderer.invoke(IPC.pickFolder, opts),
     createFolder: (): Promise<{ path: string | null }> => ipcRenderer.invoke(IPC.createFolder),
     dailyCwd: (): Promise<string> => ipcRenderer.invoke(IPC.dailyCwd),
     defaultProjectCwd: (): Promise<string> => ipcRenderer.invoke(IPC.defaultProjectCwd),

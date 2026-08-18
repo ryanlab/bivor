@@ -63,10 +63,13 @@ import {
   createSkill,
   deletePrompt,
   deleteSkill,
+  importSkill,
   installPackage,
+  installSkillSource,
   listPackages,
   listPrompts,
   listSkills,
+  checkPackageUpdates,
   readMcpConfig,
   readProjectMemory,
   readPrompt,
@@ -294,7 +297,10 @@ function registerIpc(): void {
   ipcMain.handle(IPC.packagesRemove, (e, cwd: string, source: string, local: boolean) =>
     removePackage(cwd, source, local, e.sender),
   );
-  ipcMain.handle(IPC.packagesUpdate, (e, cwd: string) => updatePackages(cwd, e.sender));
+  ipcMain.handle(IPC.packagesUpdate, (e, cwd: string, source?: string) =>
+    updatePackages(cwd, e.sender, source),
+  );
+  ipcMain.handle(IPC.packagesCheckUpdates, (_e, cwd: string) => checkPackageUpdates(cwd));
   ipcMain.handle(IPC.skillsList, (_e, cwd: string) => listSkills(cwd));
   ipcMain.handle(IPC.skillsRead, (_e, cwd: string, path: string) => readSkill(cwd, path));
   ipcMain.handle(IPC.skillsSave, (_e, cwd: string, path: string, content: string) =>
@@ -304,6 +310,16 @@ function registerIpc(): void {
     IPC.skillsCreate,
     (_e, scope: "user" | "project", cwd: string, name: string, description: string) =>
       createSkill(scope, cwd, name, description),
+  );
+  ipcMain.handle(
+    IPC.skillsInstall,
+    (e, cwd: string, source: string, local: boolean) =>
+      installSkillSource(cwd, source, local, e.sender),
+  );
+  ipcMain.handle(
+    IPC.skillsImport,
+    (_e, scope: "user" | "project", cwd: string, fromPath: string) =>
+      importSkill(scope, cwd, fromPath),
   );
   ipcMain.handle(IPC.skillsDelete, (_e, cwd: string, path: string) => deleteSkill(cwd, path));
   ipcMain.handle(IPC.promptsList, (_e, cwd: string) => listPrompts(cwd));
@@ -407,11 +423,11 @@ function registerIpc(): void {
   );
   ipcMain.on(IPC.authCancelLogin, (_e, flowId: string) => cancelLogin(flowId));
 
-  ipcMain.handle(IPC.pickFolder, async (event) => {
+  ipcMain.handle(IPC.pickFolder, async (event, opts?: { title?: string }) => {
     const win = BrowserWindow.fromWebContents(event.sender);
     const options = {
       properties: ["openDirectory", "createDirectory"] as ("openDirectory" | "createDirectory")[],
-      title: mt("dialog.pickFolder"),
+      title: opts?.title || mt("dialog.pickFolder"),
     };
     const result = win
       ? await dialog.showOpenDialog(win, options)

@@ -423,14 +423,6 @@ export function Sidebar(): React.JSX.Element {
       <div className="flex flex-col gap-1 p-2">
         <button
           type="button"
-          onClick={() => setResourcesOpen(true)}
-          className={cn(NAV_ITEM, resourcesOpen && NAV_ITEM_ON)}
-        >
-          <Package size={15} strokeWidth={1.7} />
-          {t("sidebar.resources")}
-        </button>
-        <button
-          type="button"
           onClick={() => useAppStore.getState().setUsageOpen(true)}
           className={cn(NAV_ITEM, usageOpen && NAV_ITEM_ON)}
         >
@@ -444,6 +436,14 @@ export function Sidebar(): React.JSX.Element {
         >
           <Activity size={15} strokeWidth={1.7} />
           {t("sidebar.monitor")}
+        </button>
+        <button
+          type="button"
+          onClick={() => setResourcesOpen(true)}
+          className={cn(NAV_ITEM, resourcesOpen && NAV_ITEM_ON)}
+        >
+          <Package size={15} strokeWidth={1.7} />
+          {t("sidebar.resources")}
         </button>
         <button
           type="button"

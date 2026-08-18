@@ -28,8 +28,8 @@ html[data-theme="dark"] {
   --t-diff-del: #3d2225;
   --t-diff-del-fg: #f0a8ac;
   --t-shadow: rgba(0, 0, 0, 0.45);
-  --t-scrollbar: #45423a;
-  --t-scrollbar-hover: #57534a;
+  --t-scrollbar: color-mix(in srgb, #ede8de 28%, transparent);
+  --t-scrollbar-hover: color-mix(in srgb, #ede8de 42%, transparent);
   color-scheme: dark;
 }
 
@@ -38,7 +38,7 @@ html[data-theme="light"] {
   --t-bg-secondary: #efece4;
   --t-bg-tertiary: #e7e3d9;
   --t-bg-hover: #e4e0d5;
-  --t-bg-input: #ffffff;
+  --t-bg-input: #f7f5f1;
   --t-border: #e8e4da;
   --t-border-strong: #d4cfc3;
   --t-fg: #3d3929;
@@ -58,8 +58,8 @@ html[data-theme="light"] {
   --t-diff-del: #fbe9e7;
   --t-diff-del-fg: #b3372a;
   --t-shadow: rgba(61, 57, 41, 0.14);
-  --t-scrollbar: #d5d0c4;
-  --t-scrollbar-hover: #c2bcae;
+  --t-scrollbar: color-mix(in srgb, #3d3929 22%, transparent);
+  --t-scrollbar-hover: color-mix(in srgb, #3d3929 36%, transparent);
   color-scheme: light;
 }
 
@@ -133,14 +133,19 @@ body {
 
 /* ---------- Scrollbars ---------- */
 
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--t-scrollbar) transparent;
+}
+
 ::-webkit-scrollbar {
-  width: 10px;
-  height: 10px;
+  width: 6px;
+  height: 6px;
 }
 ::-webkit-scrollbar-thumb {
   background: var(--t-scrollbar);
-  border-radius: 5px;
-  border: 2.5px solid transparent;
+  border-radius: 99px;
+  border: 1.5px solid transparent;
   background-clip: content-box;
 }
 ::-webkit-scrollbar-thumb:hover {
