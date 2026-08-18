@@ -370,7 +370,7 @@ function TaskRow({
   return (
     <div
       className={cn(
-        "rounded-xl border border-border bg-bg p-3.5 transition-opacity",
+        "rounded-xl border border-border bg-bg p-3.5 transition-colors hover:border-border-strong",
         !task.enabled && "opacity-55",
       )}
     >
@@ -532,7 +532,7 @@ export function ScheduledTasksDialog(): React.JSX.Element {
           <button
             type="button"
             onClick={() => setDraft(emptyDraft(activeProjectPath))}
-            className="flex items-center gap-1.5 rounded-full bg-accent px-3.5 py-1.5 text-xs font-medium text-accent-fg transition-colors hover:bg-accent-hover"
+            className="flex items-center gap-1.5 rounded-xl bg-accent px-3.5 py-1.5 text-xs font-medium text-accent-fg transition-colors hover:bg-accent-hover"
           >
             <Plus size={13} /> {t("common.create")}
           </button>
@@ -549,23 +549,21 @@ export function ScheduledTasksDialog(): React.JSX.Element {
           <button
             type="button"
             onClick={() => setDraft(emptyDraft(activeProjectPath))}
-            className="flex items-center gap-1.5 rounded-full bg-accent px-4 py-2 text-xs font-medium text-accent-fg transition-colors hover:bg-accent-hover"
+            className="flex items-center gap-1.5 rounded-xl bg-accent px-4 py-2 text-xs font-medium text-accent-fg transition-colors hover:bg-accent-hover"
           >
             <Plus size={13} />
             {t("schedule.create")}
           </button>
         </div>
       ) : (
-        <div className="min-h-0 flex-1 overflow-y-auto px-8 pb-10 pt-6">
-          <div className="w-full max-w-2xl space-y-3">
-            {tasks.map((task) => (
-              <TaskRow
-                key={task.id}
-                task={task}
-                onEdit={() => setDraft(draftFromTask(task, dailyCwd))}
-              />
-            ))}
-          </div>
+        <div className="min-h-0 flex-1 space-y-2.5 overflow-y-auto px-8 pb-10 pt-6">
+          {tasks.map((task) => (
+            <TaskRow
+              key={task.id}
+              task={task}
+              onEdit={() => setDraft(draftFromTask(task, dailyCwd))}
+            />
+          ))}
         </div>
       )}
     </div>

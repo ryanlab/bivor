@@ -175,7 +175,7 @@ export const en: Messages = {
   sidebar: {
     newChat: "New chat",
     newTask: "New task",
-    versions: "Bivor AI {app}",
+    brand: "Bivor AI",
     worktreeTitle: "Parallel task: run in an isolated git worktree",
     overviewChat: "Chat overview",
     overviewTask: "Task overview",

@@ -29,6 +29,9 @@ import { filterSessionsByTime } from "@/lib/session-time";
 
 const SIDEBAR_W_KEY = "bivor:sidebar-width";
 const SIDEBAR_W = { fallback: 272, min: 200, max: 480 };
+const NAV_ITEM =
+  "flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-[13px] text-fg transition-colors hover:bg-bg-hover";
+const NAV_ITEM_ON = "bg-bg-hover";
 
 function SessionRow({
   session,
@@ -221,8 +224,16 @@ export function Sidebar(): React.JSX.Element {
       <div className="px-2 pt-1">
         {versions && (
           <div className="flex items-center gap-1.5 px-2.5 pb-1.5 pt-0.5">
-            <span className="font-serif-display text-[13px] font-semibold text-fg">
-              {t("sidebar.versions", { app: versions.appVersion })}
+            <span className="flex items-baseline gap-1 font-serif-display text-[13px] font-semibold text-fg">
+              <button
+                type="button"
+                title={t("settings.tabs.about")}
+                onClick={() => setSettingsOpen(true, "about")}
+                className="transition-colors hover:text-accent"
+              >
+                {t("sidebar.brand")}
+              </button>
+              {versions.appVersion}
             </span>
             <button
               type="button"
@@ -251,42 +262,32 @@ export function Sidebar(): React.JSX.Element {
             )}
           </div>
         )}
-        <button
-          type="button"
-          onClick={showWelcome}
-          className={cn(
-            "flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-[13px] transition-colors hover:bg-bg-hover",
-            activeView === "welcome" ? "bg-bg-hover text-fg" : "text-fg",
-          )}
-        >
-          <Plus size={15} strokeWidth={1.7} />
-          {isDaily ? t("sidebar.newChat") : t("sidebar.newTask")}
-        </button>
-      </div>
-
-      <div className="px-2 pt-0.5">
-        <button
-          type="button"
-          onClick={() => useAppStore.getState().setScheduledTasksOpen(true)}
-          className={cn(
-            "flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-[13px] transition-colors hover:bg-bg-hover hover:text-fg",
-            activeView === "schedule" ? "bg-bg-hover text-fg" : "text-fg-secondary",
-          )}
-        >
-          <AlarmClock size={15} strokeWidth={1.7} className="text-fg-muted" />
-          {t("sidebar.schedule")}
-        </button>
-        <button
-          type="button"
-          onClick={() => useAppStore.getState().setDeploymentsOpen(true)}
-          className={cn(
-            "flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-[13px] transition-colors hover:bg-bg-hover hover:text-fg",
-            activeView === "deployments" ? "bg-bg-hover text-fg" : "text-fg-secondary",
-          )}
-        >
-          <Rocket size={15} strokeWidth={1.7} className="text-fg-muted" />
-          {t("sidebar.deployments")}
-        </button>
+        <div className="flex flex-col gap-1">
+          <button
+            type="button"
+            onClick={showWelcome}
+            className={cn(NAV_ITEM, activeView === "welcome" && NAV_ITEM_ON)}
+          >
+            <Plus size={15} strokeWidth={1.7} />
+            {isDaily ? t("sidebar.newChat") : t("sidebar.newTask")}
+          </button>
+          <button
+            type="button"
+            onClick={() => useAppStore.getState().setScheduledTasksOpen(true)}
+            className={cn(NAV_ITEM, activeView === "schedule" && NAV_ITEM_ON)}
+          >
+            <AlarmClock size={15} strokeWidth={1.7} />
+            {t("sidebar.schedule")}
+          </button>
+          <button
+            type="button"
+            onClick={() => useAppStore.getState().setDeploymentsOpen(true)}
+            className={cn(NAV_ITEM, activeView === "deployments" && NAV_ITEM_ON)}
+          >
+            <Rocket size={15} strokeWidth={1.7} />
+            {t("sidebar.deployments")}
+          </button>
+        </div>
       </div>
 
       {/* Open chats */}

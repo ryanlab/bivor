@@ -172,7 +172,7 @@ export const zh = {
   sidebar: {
     newChat: "新对话",
     newTask: "新任务",
-    versions: "Bivor AI {app}",
+    brand: "Bivor AI",
     worktreeTitle: "并行任务：在独立 git worktree 中运行，互不干扰",
     overviewChat: "对话总览",
     overviewTask: "任务总览",
