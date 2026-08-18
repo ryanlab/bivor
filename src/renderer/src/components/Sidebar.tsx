@@ -6,7 +6,6 @@ import {
   Check,
   GitBranch,
   GitFork,
-  LayoutGrid,
   Loader2,
   MessageSquare,
   Package,
@@ -161,13 +160,13 @@ export function Sidebar(): React.JSX.Element {
   const setActiveChat = useAppStore((s) => s.setActiveChat);
   const setSettingsOpen = useAppStore((s) => s.setSettingsOpen);
   const refreshSessions = useAppStore((s) => s.refreshSessions);
-  const showHome = useAppStore((s) => s.showHome);
   const showWelcome = useAppStore((s) => s.showWelcome);
   const activeView = useAppStore((s) => s.activeView);
   const setResourcesOpen = useAppStore((s) => s.setResourcesOpen);
   const isDaily = appMode === "daily";
   const sessionCwd = isDaily ? dailyCwd : activeProjectPath;
   const visibleChatIds = chatOrder.filter((id) => chats[id]?.kind === appMode);
+  const canWorktree = !isDaily && activeProjectIsGit;
 
   useEffect(() => {
     void refreshSessions();
@@ -185,56 +184,44 @@ export function Sidebar(): React.JSX.Element {
         <WindowChrome trafficLights />
       </Titlebar>
 
-      <div className="flex items-center gap-0.5 px-2 pt-1">
+      <div className="px-2 pt-1">
         <button
           type="button"
           onClick={showWelcome}
           className={cn(
-            "flex min-w-0 flex-1 items-center gap-2 rounded-lg px-2.5 py-2 text-[13px] transition-colors hover:bg-bg-hover",
+            "flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-[13px] transition-colors hover:bg-bg-hover",
             activeView === "welcome" ? "bg-bg-hover text-fg" : "text-fg",
           )}
         >
           <Plus size={15} strokeWidth={1.7} />
           {isDaily ? t("sidebar.newChat") : t("sidebar.newTask")}
         </button>
-        {!isDaily && activeProjectIsGit && (
-          <button
-            type="button"
-            title={t("sidebar.worktreeTitle")}
-            disabled={worktreeBusy}
-            onClick={() => {
-              setWorktreeBusy(true);
-              void openWorktreeChat().finally(() => setWorktreeBusy(false));
-            }}
-            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-fg-muted transition-colors hover:bg-bg-hover hover:text-fg disabled:opacity-40"
-          >
-            {worktreeBusy ? (
-              <Loader2 size={14} className="animate-spin" />
-            ) : (
-              <GitBranch size={14} strokeWidth={1.7} />
-            )}
-          </button>
-        )}
       </div>
 
-      {/* Mission control */}
-      {visibleChatIds.length > 0 && (
-        <div className="px-2 pt-2">
-          <button
-            type="button"
-            onClick={showHome}
-            className={cn(
-              "flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-[13px] transition-colors",
-              activeView === "home"
-                ? "bg-bg-hover text-fg"
-                : "text-fg-secondary hover:bg-bg-hover",
-            )}
-          >
-            <LayoutGrid size={15} strokeWidth={1.7} className="text-fg-muted" />
-            {isDaily ? t("sidebar.overviewChat") : t("sidebar.overviewTask")}
-          </button>
-        </div>
-      )}
+      <div className="px-2 pt-0.5">
+        <button
+          type="button"
+          onClick={() => useAppStore.getState().setScheduledTasksOpen(true)}
+          className={cn(
+            "flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-[13px] transition-colors hover:bg-bg-hover hover:text-fg",
+            activeView === "schedule" ? "bg-bg-hover text-fg" : "text-fg-secondary",
+          )}
+        >
+          <AlarmClock size={15} strokeWidth={1.7} className="text-fg-muted" />
+          {t("sidebar.schedule")}
+        </button>
+        <button
+          type="button"
+          onClick={() => useAppStore.getState().setDeploymentsOpen(true)}
+          className={cn(
+            "flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-[13px] transition-colors hover:bg-bg-hover hover:text-fg",
+            activeView === "deployments" ? "bg-bg-hover text-fg" : "text-fg-secondary",
+          )}
+        >
+          <Rocket size={15} strokeWidth={1.7} className="text-fg-muted" />
+          {t("sidebar.deployments")}
+        </button>
+      </div>
 
       {/* Open chats */}
       {visibleChatIds.length > 0 && (
@@ -282,6 +269,25 @@ export function Sidebar(): React.JSX.Element {
                 )}
                 {(chat.subagents ? Object.values(chat.subagents).some((s) => s.state === "running") : false) && (
                   <GitFork size={11} className="shrink-0 text-accent" />
+                )}
+                {canWorktree && !chat.worktree && (
+                  <button
+                    type="button"
+                    title={t("sidebar.worktreeTitle")}
+                    disabled={worktreeBusy}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setWorktreeBusy(true);
+                      void openWorktreeChat({ taskHint: label }).finally(() => setWorktreeBusy(false));
+                    }}
+                    className="hidden shrink-0 rounded p-0.5 text-fg-muted hover:bg-bg-tertiary hover:text-fg group-hover:block disabled:opacity-40"
+                  >
+                    {worktreeBusy ? (
+                      <Loader2 size={12} className="animate-spin" />
+                    ) : (
+                      <GitBranch size={12} />
+                    )}
+                  </button>
                 )}
                 <button
                   type="button"
@@ -365,22 +371,6 @@ export function Sidebar(): React.JSX.Element {
         >
           <Activity size={14} />
           {t("sidebar.monitor")}
-        </button>
-        <button
-          type="button"
-          onClick={() => useAppStore.getState().setScheduledTasksOpen(true)}
-          className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-xs text-fg-secondary transition-colors hover:bg-bg-hover"
-        >
-          <AlarmClock size={14} />
-          {t("sidebar.schedule")}
-        </button>
-        <button
-          type="button"
-          onClick={() => useAppStore.getState().setDeploymentsOpen(true)}
-          className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-xs text-fg-secondary transition-colors hover:bg-bg-hover"
-        >
-          <Rocket size={14} />
-          {t("sidebar.deployments")}
         </button>
         <button
           type="button"

@@ -1,12 +1,10 @@
-import { FolderTree, Monitor, SquareTerminal } from "lucide-react";
 import { TITLEBAR_HEIGHT } from "@shared/titlebar";
 import { getRuntimePreset } from "@shared/runtime-presets";
 import { useAppStore, WORKSPACE_TERM_ID } from "@/stores/app-store";
 import { cn } from "@/lib/cn";
 import { useT } from "@/lib/i18n";
+import { FilesGlyph, Glyph, SandboxGlyph, TerminalGlyph } from "./glyphs";
 
-const ICON = 16;
-const STROKE = 1.3;
 const MOD = navigator.platform.startsWith("Mac") ? "⌘" : "Ctrl";
 
 export function Titlebar({
@@ -28,22 +26,6 @@ export function Titlebar({
 
 const chromeBtn =
   "no-drag relative inline-flex size-7 shrink-0 items-center justify-center rounded-lg text-fg-muted transition-colors hover:bg-bg-hover hover:text-fg-secondary";
-
-function Glyph({ children }: { children: React.ReactNode }): React.JSX.Element {
-  return (
-    <svg
-      width={ICON}
-      height={ICON}
-      viewBox="0 0 16 16"
-      fill="none"
-      aria-hidden
-      stroke="currentColor"
-      strokeWidth={STROKE}
-    >
-      {children}
-    </svg>
-  );
-}
 
 function SidebarGlyph({ rail }: { rail: boolean }): React.JSX.Element {
   return (
@@ -72,12 +54,8 @@ function ComposeGlyph(): React.JSX.Element {
 function SearchGlyph(): React.JSX.Element {
   return (
     <Glyph>
-      <path
-        d="M8.4 14.6H4.8A3.4 3.4 0 0 1 1.4 11.2V4.8A3.4 3.4 0 0 1 4.8 1.4h6.4A3.4 3.4 0 0 1 14.6 4.8V8.2"
-        strokeLinecap="round"
-      />
-      <circle cx="7.3" cy="7.3" r="2.55" />
-      <path d="M9.2 9.2 13.8 13.8" strokeLinecap="round" />
+      <circle cx="7" cy="7" r="4.7" />
+      <path d="M10.5 10.5 14 14" strokeLinecap="round" />
     </Glyph>
   );
 }
@@ -178,7 +156,7 @@ function IdleIconButton({
       title={title}
       onClick={onToggle}
       className={cn(
-        "no-drag relative rounded-md p-1.5 text-fg-muted transition-colors hover:bg-bg-hover hover:text-fg-secondary",
+        "no-drag relative inline-flex size-7 shrink-0 items-center justify-center rounded-lg text-fg-muted transition-colors hover:bg-bg-hover hover:text-fg-secondary",
         open && "bg-bg-hover text-fg",
       )}
     >
@@ -194,6 +172,7 @@ function IdleIconButton({
 export function IdleTitlebar(): React.JSX.Element | null {
   const t = useT();
   const collapsed = useAppStore((s) => s.sidebarCollapsed);
+  const activeView = useAppStore((s) => s.activeView);
   const appMode = useAppStore((s) => s.appMode);
   const codingPresetId = useAppStore((s) => s.codingPresetId);
   const cwd = useAppStore((s) => s.activeProjectPath ?? s.defaultProjectCwd);
@@ -205,9 +184,10 @@ export function IdleTitlebar(): React.JSX.Element | null {
   const filesOpen = useAppStore((s) => s.workspaceFilesOpen);
   const setFilesOpen = useAppStore((s) => s.setWorkspaceFilesOpen);
   const preset = getRuntimePreset(appMode === "daily" ? "daily" : codingPresetId, appMode);
-  const showTerm = preset.ui.bashBang && Boolean(cwd);
-  const showSandbox = preset.ui.sandbox;
-  const showFiles = preset.ui.fileTree && Boolean(cwd);
+  const pageView = activeView === "schedule" || activeView === "deployments";
+  const showTerm = !pageView && preset.ui.bashBang && Boolean(cwd);
+  const showSandbox = !pageView && preset.ui.sandbox;
+  const showFiles = !pageView && preset.ui.fileTree && Boolean(cwd);
   const icons = (showTerm || showSandbox || showFiles) && (
     <div className="pointer-events-auto flex items-center gap-2">
       {showFiles && (
@@ -216,7 +196,7 @@ export function IdleTitlebar(): React.JSX.Element | null {
           open={filesOpen}
           onToggle={() => setFilesOpen(!filesOpen)}
         >
-          <FolderTree size={14} />
+          <FilesGlyph />
         </IdleIconButton>
       )}
       {showTerm && (
@@ -225,7 +205,7 @@ export function IdleTitlebar(): React.JSX.Element | null {
           open={termOpen}
           onToggle={() => setTermOpen(WORKSPACE_TERM_ID, !termOpen)}
         >
-          <SquareTerminal size={14} />
+          <TerminalGlyph />
         </IdleIconButton>
       )}
       {showSandbox && (
@@ -235,7 +215,7 @@ export function IdleTitlebar(): React.JSX.Element | null {
           live={sandboxLive}
           onToggle={() => setSandboxOpen(!sandboxOpen)}
         >
-          <Monitor size={14} />
+          <SandboxGlyph />
         </IdleIconButton>
       )}
     </div>

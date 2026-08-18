@@ -126,11 +126,18 @@ export default function App(): React.JSX.Element {
               <ChatView chat={activeChat} />
             ) : activeView === "welcome" ? (
               <WelcomeScreen />
+            ) : activeView === "schedule" ? (
+              <ScheduledTasksDialog />
+            ) : activeView === "deployments" ? (
+              <DeploymentsPanel />
             ) : (
               <MissionControl />
             )}
           </div>
-          {!activeChat && (workspaceFilesOpen || workspaceSandboxOpen) && (
+          {!activeChat &&
+            activeView !== "schedule" &&
+            activeView !== "deployments" &&
+            (workspaceFilesOpen || workspaceSandboxOpen) && (
             <div className="flex min-h-0 shrink-0 bg-bg-secondary">
               {workspaceFilesOpen && workspaceCwd && (
                 <FileTreePanel cwd={workspaceCwd} onClose={() => setWorkspaceFilesOpen(false)} />
@@ -139,7 +146,11 @@ export default function App(): React.JSX.Element {
             </div>
           )}
         </div>
-        {!activeChat && workspaceTerm.open && workspaceCwd && (
+        {!activeChat &&
+          activeView !== "schedule" &&
+          activeView !== "deployments" &&
+          workspaceTerm.open &&
+          workspaceCwd && (
           <TerminalDrawer
             sandbox={false}
             chat={{
@@ -156,8 +167,6 @@ export default function App(): React.JSX.Element {
       <ResourcesDialog />
       <UsageDialog />
       <AgentMonitorDialog />
-      <ScheduledTasksDialog />
-      <DeploymentsPanel />
       {shortcutsOpen && <ShortcutsOverlay onClose={() => setShortcutsOpen(false)} />}
       <CommandPalette />
     </div>

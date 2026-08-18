@@ -616,8 +616,15 @@ type TabId = (typeof TAB_IDS)[number];
 export function SettingsDialog(): React.JSX.Element | null {
   const t = useT();
   const open = useAppStore((s) => s.settingsOpen);
+  const requestedTab = useAppStore((s) => s.settingsTab);
   const setOpen = useAppStore((s) => s.setSettingsOpen);
   const [tab, setTab] = useState<TabId>("auth");
+
+  useEffect(() => {
+    if (open && requestedTab && TAB_IDS.includes(requestedTab as TabId)) {
+      setTab(requestedTab as TabId);
+    }
+  }, [open, requestedTab]);
   const tabs: { id: TabId; label: string; icon: React.ReactNode }[] = [
     { id: "auth", label: t("settings.tabs.auth"), icon: <KeyRound size={14} /> },
     { id: "sandbox", label: t("settings.tabs.sandbox"), icon: <MonitorPlay size={14} /> },

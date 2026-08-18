@@ -22,7 +22,6 @@ import {
   Settings,
   Trash2,
   Wrench,
-  X,
   XCircle,
 } from "lucide-react";
 import type {
@@ -457,11 +456,10 @@ function DeploymentRow({
   );
 }
 
-export function DeploymentsPanel(): React.JSX.Element | null {
+export function DeploymentsPanel(): React.JSX.Element {
   const t = useT();
-  const open = useAppStore((s) => s.deploymentsOpen);
-  const setOpen = useAppStore((s) => s.setDeploymentsOpen);
   const setSettingsOpen = useAppStore((s) => s.setSettingsOpen);
+  const settingsOpen = useAppStore((s) => s.settingsOpen);
 
   const [configured, setConfigured] = useState<boolean | null>(null);
   const [projects, setProjects] = useState<VercelProjectInfo[]>([]);
@@ -490,9 +488,9 @@ export function DeploymentsPanel(): React.JSX.Element | null {
     [projectId],
   );
 
-  // 打开时：检查配置 → 拉项目列表 + 部署列表
+  // 进入页面或关掉设置后：检查配置 → 拉项目列表 + 部署列表
   useEffect(() => {
-    if (!open) return;
+    if (settingsOpen) return;
     setError(null);
     setNotice(null);
     void window.pi.deployments.configured().then((ok) => {
@@ -500,13 +498,13 @@ export function DeploymentsPanel(): React.JSX.Element | null {
       if (!ok) return;
       void window.pi.deployments.projects().then(setProjects).catch(() => setProjects([]));
     });
-  }, [open]);
+  }, [settingsOpen]);
 
   useEffect(() => {
-    if (!open || !configured) return;
+    if (!configured) return;
     setDeployments(null);
     void refresh(true);
-  }, [open, configured, refresh]);
+  }, [configured, refresh]);
 
   // 自动轮询：有构建中的部署时 4s，否则 15s
   const hasActive = useMemo(
@@ -514,11 +512,11 @@ export function DeploymentsPanel(): React.JSX.Element | null {
     [deployments],
   );
   useEffect(() => {
-    if (!open || !configured) return;
+    if (!configured) return;
     const interval = hasActive ? 4000 : 15000;
     pollRef.current = setTimeout(() => void refresh(true), interval);
     return () => clearTimeout(pollRef.current);
-  }, [open, configured, hasActive, deployments, refresh]);
+  }, [configured, hasActive, deployments, refresh]);
 
   const runAction = async (action: string, dep: VercelDeploymentInfo): Promise<void> => {
     const id = dep.url ?? dep.id;
@@ -557,124 +555,102 @@ export function DeploymentsPanel(): React.JSX.Element | null {
     }
   };
 
-  if (!open) return null;
-
   return (
-    <div
-      className="overlay-in fixed inset-0 z-50 flex items-center justify-center bg-black/50"
-      onClick={() => setOpen(false)}
-    >
-      <div
-        className="dialog-in flex h-[600px] max-h-[85vh] w-[760px] flex-col overflow-hidden rounded-2xl border border-border-strong bg-bg-secondary shadow-2xl"
-        onClick={(e) => e.stopPropagation()}
-      >
-        {/* Header */}
-        <div className="flex shrink-0 items-center gap-2 border-b border-border px-5 py-3.5">
-          <Rocket size={15} className="text-accent" />
-          <span className="text-sm font-medium">{t("sidebar.deployments")}</span>
-          <span className="text-[11px] text-fg-muted">Vercel</span>
-          {hasActive && (
-            <span className="flex items-center gap-1 text-[10.5px] text-warning">
-              <Loader2 size={11} className="animate-spin" />
-              {t("deploy.buildingRefresh")}
-            </span>
-          )}
-          <div className="flex-1" />
-          {configured && (
-            <>
-              <select
-                value={projectId}
-                onChange={(e) => setProjectId(e.target.value)}
-                className="max-w-44 rounded-lg border border-border bg-bg px-2 py-1 text-[11px] text-fg outline-none focus:border-accent/60"
-              >
-                <option value="">{t("deploy.allProjects")}</option>
-                {projects.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.name}
-                  </option>
-                ))}
-              </select>
-              <button
-                type="button"
-                onClick={() => void refresh()}
-                title={t("common.refresh")}
-                className="rounded-md p-1.5 text-fg-muted transition-colors hover:bg-bg-hover hover:text-fg"
-              >
-                <RefreshCw size={13} className={cn(refreshing && "animate-spin")} />
-              </button>
-            </>
-          )}
+    <div className="flex min-h-0 flex-1 flex-col">
+      <div className="flex shrink-0 items-end justify-between gap-4 px-8 pt-8">
+        <div>
+          <h1 className="font-serif-display text-[26px] leading-tight">{t("sidebar.deployments")}</h1>
+          <p className="flex items-center gap-2 pt-0.5 text-xs text-fg-muted">
+            {t("deploy.subtitle")}
+            {hasActive && (
+              <span className="flex items-center gap-1 text-warning">
+                <Loader2 size={11} className="animate-spin" />
+                {t("deploy.buildingRefresh")}
+              </span>
+            )}
+          </p>
+        </div>
+        {configured && (
+          <div className="flex shrink-0 items-center gap-2">
+            <select
+              value={projectId}
+              onChange={(e) => setProjectId(e.target.value)}
+              className="max-w-44 rounded-lg border border-border bg-bg px-2 py-1.5 text-[11px] text-fg outline-none focus:border-accent/60"
+            >
+              <option value="">{t("deploy.allProjects")}</option>
+              {projects.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.name}
+                </option>
+              ))}
+            </select>
+            <button
+              type="button"
+              onClick={() => void refresh()}
+              title={t("common.refresh")}
+              className="rounded-md p-1.5 text-fg-muted transition-colors hover:bg-bg-hover hover:text-fg"
+            >
+              <RefreshCw size={13} className={cn(refreshing && "animate-spin")} />
+            </button>
+          </div>
+        )}
+      </div>
+
+      {configured === false && (
+        <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-3 px-8 pb-8 text-center">
+          <Rocket size={28} className="text-fg-muted" />
+          <div className="text-sm font-medium">{t("deploy.noToken")}</div>
+          <p className="max-w-sm text-xs leading-relaxed text-fg-muted">
+            {t("deploy.noTokenIntro")}
+          </p>
           <button
             type="button"
-            onClick={() => setOpen(false)}
-            className="rounded-md p-1 text-fg-muted transition-colors hover:bg-bg-hover hover:text-fg"
+            onClick={() => setSettingsOpen(true, "deploy")}
+            className="flex items-center gap-1.5 rounded-xl bg-accent px-4 py-2 text-xs font-medium text-accent-fg transition-colors hover:bg-accent-hover"
           >
-            <X size={15} />
+            <Settings size={13} />
+            {t("deploy.goSettings")}
           </button>
         </div>
+      )}
 
-        {/* Body */}
-        <div className="min-h-0 flex-1 overflow-y-auto p-4">
-          {configured === false && (
-            <div className="flex flex-col items-center gap-3 py-16 text-center">
-              <Rocket size={28} className="text-fg-muted" />
-              <div className="text-sm font-medium">{t("deploy.noToken")}</div>
-              <p className="max-w-sm text-xs leading-relaxed text-fg-muted">
-                {t("deploy.noTokenIntro")}
-              </p>
-              <button
-                type="button"
-                onClick={() => {
-                  setOpen(false);
-                  setSettingsOpen(true);
-                }}
-                className="flex items-center gap-1.5 rounded-xl bg-accent px-4 py-2 text-xs font-medium text-accent-fg transition-colors hover:bg-accent-hover"
-              >
-                <Settings size={13} />
-                {t("deploy.goSettings")}
-              </button>
-            </div>
-          )}
-
-          {configured && (
-            <div className="space-y-2.5">
-              {projectId && <ProjectInfoCard projectId={projectId} />}
-              {error && (
-                <div className="rounded-lg border border-danger/30 bg-danger/5 px-3 py-2 text-[11px] text-danger">
-                  {error}
-                </div>
-              )}
-              {notice && (
-                <div className="rounded-lg border border-success/30 bg-success/5 px-3 py-2 text-[11px] text-success">
-                  {notice}
-                </div>
-              )}
-              {deployments === null && !error && (
-                <div className="flex items-center justify-center py-16">
-                  <Loader2 size={18} className="animate-spin text-fg-muted" />
-                </div>
-              )}
-              {deployments?.length === 0 && (
-                <div className="py-16 text-center text-xs text-fg-muted">
-                  {t("deploy.empty")}
-                </div>
-              )}
-              {deployments?.map((dep) => (
-                <DeploymentRow
-                  key={dep.id}
-                  dep={dep}
-                  onAction={(action, d) => void runAction(action, d)}
-                  busyAction={busy?.startsWith(`${dep.id}:`) ? busy.split(":")[1] : undefined}
-                />
-              ))}
-              <div className="flex items-center justify-center gap-1.5 pt-1 text-[10px] text-fg-muted">
-                <RotateCcw size={10} />
-                {hasActive ? t("deploy.pollFast") : t("deploy.pollSlow")} · {t("deploy.recent")}
+      {configured && (
+        <div className="min-h-0 flex-1 space-y-2.5 overflow-y-auto px-8 pb-10 pt-6">
+            {projectId && <ProjectInfoCard projectId={projectId} />}
+            {error && (
+              <div className="rounded-lg border border-danger/30 bg-danger/5 px-3 py-2 text-[11px] text-danger">
+                {error}
               </div>
-            </div>
-          )}
+            )}
+            {notice && (
+              <div className="rounded-lg border border-success/30 bg-success/5 px-3 py-2 text-[11px] text-success">
+                {notice}
+              </div>
+            )}
+            {deployments === null && !error && (
+              <div className="flex items-center justify-center py-16">
+                <Loader2 size={18} className="animate-spin text-fg-muted" />
+              </div>
+            )}
+            {deployments?.length === 0 && (
+              <div className="flex min-h-[40vh] items-center justify-center text-center text-xs text-fg-muted">
+                {t("deploy.empty")}
+              </div>
+            )}
+            {deployments?.map((dep) => (
+              <DeploymentRow
+                key={dep.id}
+                dep={dep}
+                onAction={(action, d) => void runAction(action, d)}
+                busyAction={busy?.startsWith(`${dep.id}:`) ? busy.split(":")[1] : undefined}
+              />
+            ))}
+          <div className="flex items-center justify-center gap-1.5 pt-1 text-[10px] text-fg-muted">
+            <RotateCcw size={10} />
+            {hasActive ? t("deploy.pollFast") : t("deploy.pollSlow")} · {t("deploy.recent")}
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }

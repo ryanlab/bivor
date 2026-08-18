@@ -6,13 +6,13 @@ import { useState } from "react";
 import {
   AlarmClock,
   CalendarClock,
+  FolderOpen,
   Loader2,
   MessageSquare,
   Pencil,
   Play,
   Plus,
   Trash2,
-  X,
 } from "lucide-react";
 import type { ScheduledTask, TaskSchedule } from "@shared/protocol";
 import { RUNTIME_PRESETS, getRuntimePreset } from "@shared/runtime-presets";
@@ -25,6 +25,10 @@ import type { Locale } from "@shared/i18n";
 
 function weekdayLabels(t: Translator): string[] {
   return t("schedule.weekday").split(",");
+}
+
+function weekdayShortLabels(t: Translator): string[] {
+  return t("schedule.weekdayShort").split(",");
 }
 
 function describeSchedule(schedule: TaskSchedule, t: Translator, locale: Locale): string {
@@ -96,11 +100,7 @@ function draftFromTask(task: ScheduledTask, dailyCwd?: string): TaskDraft {
   };
 }
 
-const inputCls =
-  "w-full rounded-lg border border-border bg-bg px-2.5 py-1.5 text-xs outline-none transition-colors focus:border-accent";
-const labelCls = "pb-1.5 text-[11px] font-medium text-fg-muted";
-
-function SegButton({
+function Pill({
   active,
   onClick,
   children,
@@ -114,8 +114,10 @@ function SegButton({
       type="button"
       onClick={onClick}
       className={cn(
-        "rounded-md px-2.5 py-1 text-[11px] transition-colors",
-        active ? "bg-accent/15 text-accent" : "text-fg-muted hover:bg-bg-hover hover:text-fg",
+        "h-8 rounded-full px-3 text-[12px] transition-colors",
+        active
+          ? "bg-accent text-accent-fg"
+          : "bg-bg-tertiary text-fg-muted hover:bg-bg-hover hover:text-fg",
       )}
     >
       {children}
@@ -137,11 +139,8 @@ function TaskForm({
   const t = useT();
   const [saving, setSaving] = useState(false);
   const patch = (p: Partial<TaskDraft>): void => onChange({ ...draft, ...p });
-  const weekdays = weekdayLabels(t);
-
-  const presetChoices = RUNTIME_PRESETS.filter((p) =>
-    draft.target === "daily" ? p.workspace === "daily" : p.workspace === "project",
-  );
+  const weekdays = weekdayShortLabels(t);
+  const projectPresets = RUNTIME_PRESETS.filter((p) => p.workspace === "project");
 
   const canSave =
     draft.name.trim() !== "" &&
@@ -156,118 +155,58 @@ function TaskForm({
     if (path) patch({ projectPath: path });
   };
 
-  return (
-    <div className="space-y-4 rounded-xl border border-border bg-bg p-4">
-      <div className="grid grid-cols-2 gap-3">
-        <div>
-          <div className={labelCls}>{t("schedule.name")}</div>
-          <input
-            className={inputCls}
-            value={draft.name}
-            onChange={(e) => patch({ name: e.target.value })}
-            placeholder={t("schedule.namePh")}
-          />
-        </div>
-        <div>
-          <div className={labelCls}>{t("schedule.runMode")}</div>
-          <div className="flex gap-1 rounded-lg border border-border bg-bg p-0.5">
-            <SegButton
-              active={draft.runMode === "background"}
-              onClick={() => patch({ runMode: "background" })}
-            >
-              {t("schedule.silent")}
-            </SegButton>
-            <SegButton
-              active={draft.runMode === "open-chat"}
-              onClick={() => patch({ runMode: "open-chat" })}
-            >
-              {t("schedule.autoOpen")}
-            </SegButton>
-          </div>
-        </div>
-      </div>
+  const control =
+    "h-8 rounded-full bg-bg-tertiary px-3 text-[12px] text-fg outline-none focus:ring-1 focus:ring-accent/40";
 
-      <div>
-        <div className={labelCls}>{t("schedule.prompt")}</div>
+  return (
+    <div className="mx-auto w-full max-w-lg">
+      <h2 className="font-serif-display text-[26px] leading-tight">
+        {draft.id ? t("schedule.edit") : t("schedule.create")}
+      </h2>
+      <p className="pt-1 text-xs text-fg-muted">{t("schedule.subtitle")}</p>
+
+      <input
+        value={draft.name}
+        onChange={(e) => patch({ name: e.target.value })}
+        placeholder={t("schedule.namePh")}
+        className="mt-6 w-full bg-transparent text-[15px] font-medium text-fg outline-none placeholder:font-normal placeholder:text-fg-muted"
+      />
+      <div className="composer-shadow mt-3 rounded-[20px] border border-border bg-bg-input transition-colors focus-within:border-accent/50">
         <textarea
-          className={cn(inputCls, "min-h-[72px] resize-y font-mono text-[11px] leading-relaxed")}
           value={draft.prompt}
           onChange={(e) => patch({ prompt: e.target.value })}
           placeholder={t("schedule.promptPh")}
+          rows={3}
+          className="w-full resize-none bg-transparent px-4 py-3 text-[13px] leading-relaxed text-fg outline-none placeholder:text-fg-muted"
         />
       </div>
 
-      <div className="grid grid-cols-2 gap-3">
-        <div>
-          <div className={labelCls}>{t("schedule.env")}</div>
-          <div className="flex gap-1 rounded-lg border border-border bg-bg p-0.5">
-            <SegButton
-              active={draft.target === "daily"}
-              onClick={() => patch({ target: "daily", presetId: "daily" })}
-            >
-              {t("preset.daily")}
-            </SegButton>
-            <SegButton
-              active={draft.target === "project"}
-              onClick={() => patch({ target: "project", presetId: "coding" })}
-            >
-              {t("schedule.project")}
-            </SegButton>
-          </div>
-          {draft.target === "project" && (
-            <button
-              type="button"
-              onClick={() => void pickProject()}
-              className="mt-1.5 w-full truncate rounded-lg border border-dashed border-border px-2.5 py-1.5 text-left text-[11px] text-fg-muted transition-colors hover:border-accent hover:text-fg"
-            >
-              {draft.projectPath ? shortenPath(draft.projectPath) : t("schedule.pickProject")}
-            </button>
-          )}
-        </div>
-        <div>
-          <div className={labelCls}>{t("schedule.preset")}</div>
-          <select
-            className={inputCls}
-            value={draft.presetId}
-            onChange={(e) => patch({ presetId: e.target.value })}
+      <div className="mt-5 grid grid-cols-[2.5rem_1fr] items-center gap-x-3 gap-y-2.5">
+        <div className="text-[12px] text-fg-muted">{t("schedule.timing")}</div>
+        <div className="flex flex-wrap items-center gap-1.5">
+          <Pill
+            active={draft.scheduleType === "interval"}
+            onClick={() => patch({ scheduleType: "interval" })}
           >
-            {presetChoices.map((p) => (
-              <option key={p.id} value={p.id}>
-                {t(`preset.${p.id}`)} — {t(`preset.${p.id}Desc`)}
-              </option>
-            ))}
-          </select>
-        </div>
-      </div>
-
-      <div>
-        <div className={labelCls}>{t("schedule.timing")}</div>
-        <div className="flex items-center gap-2">
-          <div className="flex gap-1 rounded-lg border border-border bg-bg p-0.5">
-            <SegButton
-              active={draft.scheduleType === "interval"}
-              onClick={() => patch({ scheduleType: "interval" })}
-            >
-              {t("schedule.intervalType")}
-            </SegButton>
-            <SegButton
-              active={draft.scheduleType === "daily"}
-              onClick={() => patch({ scheduleType: "daily" })}
-            >
-              {t("schedule.dailyType")}
-            </SegButton>
-            <SegButton
-              active={draft.scheduleType === "weekly"}
-              onClick={() => patch({ scheduleType: "weekly" })}
-            >
-              {t("schedule.weeklyType")}
-            </SegButton>
-          </div>
-          {draft.scheduleType === "interval" && (
-            <div className="flex items-center gap-1.5 text-xs text-fg-secondary">
+            {t("schedule.intervalType")}
+          </Pill>
+          <Pill
+            active={draft.scheduleType === "daily"}
+            onClick={() => patch({ scheduleType: "daily" })}
+          >
+            {t("schedule.dailyType")}
+          </Pill>
+          <Pill
+            active={draft.scheduleType === "weekly"}
+            onClick={() => patch({ scheduleType: "weekly" })}
+          >
+            {t("schedule.weeklyType")}
+          </Pill>
+          {draft.scheduleType === "interval" ? (
+            <div className="flex items-center gap-1.5 text-[12px] text-fg-secondary">
               {t("schedule.every")}
               <input
-                className={cn(inputCls, "w-16 text-center")}
+                className={cn(control, "w-14 px-2 text-center")}
                 type="number"
                 min={1}
                 value={draft.everyMinutes}
@@ -275,48 +214,113 @@ function TaskForm({
               />
               {t("schedule.minutes")}
             </div>
-          )}
-          {draft.scheduleType !== "interval" && (
+          ) : (
             <input
-              className={cn(inputCls, "w-28")}
+              className={cn(control, "w-[5.5rem]")}
               type="time"
               value={draft.time}
               onChange={(e) => patch({ time: e.target.value })}
             />
           )}
         </div>
+
         {draft.scheduleType === "weekly" && (
-          <div className="mt-2 flex gap-1">
-            {weekdays.map((label, day) => (
-              <button
-                key={day}
-                type="button"
-                onClick={() =>
-                  patch({
-                    days: draft.days.includes(day)
-                      ? draft.days.filter((d) => d !== day)
-                      : [...draft.days, day],
-                  })
-                }
-                className={cn(
-                  "h-7 w-7 rounded-md border text-[11px] transition-colors",
-                  draft.days.includes(day)
-                    ? "border-accent/40 bg-accent/15 text-accent"
-                    : "border-border text-fg-muted hover:bg-bg-hover",
-                )}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
+          <>
+            <div />
+            <div className="flex gap-1">
+              {weekdays.map((label, day) => (
+                <button
+                  key={day}
+                  type="button"
+                  title={weekdayLabels(t)[day]}
+                  onClick={() =>
+                    patch({
+                      days: draft.days.includes(day)
+                        ? draft.days.filter((d) => d !== day)
+                        : [...draft.days, day],
+                    })
+                  }
+                  className={cn(
+                    "h-8 min-w-8 rounded-full px-1.5 text-[12px] transition-colors",
+                    draft.days.includes(day)
+                      ? "bg-accent text-accent-fg"
+                      : "bg-bg-tertiary text-fg-muted hover:text-fg",
+                  )}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          </>
         )}
+
+        <div className="text-[12px] text-fg-muted">{t("schedule.where")}</div>
+        <div className="flex flex-wrap items-center gap-1.5">
+          <Pill
+            active={draft.target === "daily"}
+            onClick={() => patch({ target: "daily", presetId: "daily" })}
+          >
+            {t("preset.daily")}
+          </Pill>
+          <Pill
+            active={draft.target === "project"}
+            onClick={() => patch({ target: "project", presetId: "coding" })}
+          >
+            {t("schedule.project")}
+          </Pill>
+          {draft.target === "project" && (
+            <button
+              type="button"
+              onClick={() => void pickProject()}
+              className={cn(control, "flex max-w-[200px] items-center gap-1.5 text-fg-muted hover:text-fg")}
+            >
+              <FolderOpen size={12} className="shrink-0" />
+              <span className="truncate">
+                {draft.projectPath ? shortenPath(draft.projectPath) : t("schedule.pickProject")}
+              </span>
+            </button>
+          )}
+        </div>
+
+        {draft.target === "project" && (
+          <>
+            <div className="text-[12px] text-fg-muted">{t("schedule.mode")}</div>
+            <div className="flex flex-wrap gap-1.5">
+              {projectPresets.map((p) => (
+                <Pill
+                  key={p.id}
+                  active={draft.presetId === p.id}
+                  onClick={() => patch({ presetId: p.id })}
+                >
+                  {t(`preset.${p.id}`)}
+                </Pill>
+              ))}
+            </div>
+          </>
+        )}
+
+        <div className="text-[12px] text-fg-muted">{t("schedule.how")}</div>
+        <div className="flex flex-wrap gap-1.5">
+          <Pill
+            active={draft.runMode === "background"}
+            onClick={() => patch({ runMode: "background" })}
+          >
+            {t("schedule.background")}
+          </Pill>
+          <Pill
+            active={draft.runMode === "open-chat"}
+            onClick={() => patch({ runMode: "open-chat" })}
+          >
+            {t("schedule.openChat")}
+          </Pill>
+        </div>
       </div>
 
-      <div className="flex justify-end gap-2">
+      <div className="mt-6 flex items-center justify-end gap-2">
         <button
           type="button"
           onClick={onCancel}
-          className="rounded-lg px-3 py-1.5 text-xs text-fg-muted transition-colors hover:bg-bg-hover hover:text-fg"
+          className="h-8 rounded-full px-3.5 text-[13px] text-fg-muted transition-colors hover:bg-bg-hover hover:text-fg"
         >
           {t("common.cancel")}
         </button>
@@ -327,7 +331,7 @@ function TaskForm({
             setSaving(true);
             onSave();
           }}
-          className="rounded-lg bg-accent px-3.5 py-1.5 text-xs font-medium text-accent-fg transition-opacity hover:opacity-90 disabled:opacity-40"
+          className="h-8 rounded-full bg-accent px-4 text-[13px] font-medium text-accent-fg transition-colors hover:bg-accent-hover disabled:cursor-not-allowed disabled:opacity-35"
         >
           {draft.id ? t("schedule.saveEdit") : t("schedule.create")}
         </button>
@@ -351,7 +355,6 @@ function TaskRow({
   const deleteTask = useAppStore((s) => s.deleteScheduledTask);
   const saveTask = useAppStore((s) => s.saveScheduledTask);
   const openChat = useAppStore((s) => s.openChat);
-  const setOpen = useAppStore((s) => s.setScheduledTasksOpen);
   const preset = getRuntimePreset(task.presetId, task.kind);
 
   const openResult = (): void => {
@@ -362,7 +365,6 @@ function TaskRow({
       presetId: task.presetId,
       sessionFile: task.lastRun.sessionFile,
     });
-    setOpen(false);
   };
 
   return (
@@ -470,17 +472,13 @@ function TaskRow({
 
 // ---------- 对话框 ----------
 
-export function ScheduledTasksDialog(): React.JSX.Element | null {
+export function ScheduledTasksDialog(): React.JSX.Element {
   const t = useT();
-  const open = useAppStore((s) => s.scheduledTasksOpen);
-  const setOpen = useAppStore((s) => s.setScheduledTasksOpen);
   const tasks = useAppStore((s) => s.scheduledTasks);
   const saveTask = useAppStore((s) => s.saveScheduledTask);
   const activeProjectPath = useAppStore((s) => s.activeProjectPath);
   const dailyCwd = useAppStore((s) => s.dailyCwd);
   const [draft, setDraft] = useState<TaskDraft | null>(null);
-
-  if (!open) return null;
 
   const submit = async (d: TaskDraft): Promise<void> => {
     const cwd = d.target === "daily" ? (dailyCwd ?? (await window.pi.system.dailyCwd())) : d.projectPath;
@@ -506,63 +504,70 @@ export function ScheduledTasksDialog(): React.JSX.Element | null {
     setDraft(null);
   };
 
-  return (
-    <div
-      className="overlay-in fixed inset-0 z-50 flex items-center justify-center bg-black/50"
-      onClick={() => setOpen(false)}
-    >
-      <div
-        className="dialog-in flex max-h-[82vh] w-[640px] flex-col overflow-hidden rounded-2xl border border-border-strong bg-bg-secondary shadow-2xl"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="flex shrink-0 items-center gap-2 border-b border-border px-5 py-3.5">
-          <AlarmClock size={15} className="text-accent" />
-          <span className="text-sm font-medium">{t("sidebar.schedule")}</span>
-          <span className="text-[11px] text-fg-muted">{t("schedule.subtitle")}</span>
-          <div className="flex-1" />
-          {!draft && (
-            <button
-              type="button"
-              onClick={() => setDraft(emptyDraft(activeProjectPath))}
-              className="flex items-center gap-1 rounded-lg bg-accent px-2.5 py-1 text-[11px] font-medium text-accent-fg transition-opacity hover:opacity-90"
-            >
-              <Plus size={12} /> {t("common.create")}
-            </button>
-          )}
-          <button
-            type="button"
-            onClick={() => setOpen(false)}
-            className="rounded-md p-1 text-fg-muted transition-colors hover:bg-bg-hover hover:text-fg"
-          >
-            <X size={15} />
-          </button>
-        </div>
+  const empty = tasks.length === 0 && !draft;
 
-        <div className="min-h-0 flex-1 space-y-3 overflow-y-auto p-5">
-          {draft && (
-            <TaskForm
-              draft={draft}
-              onChange={setDraft}
-              onCancel={() => setDraft(null)}
-              onSave={() => void submit(draft)}
-            />
-          )}
-          {tasks.length === 0 && !draft && (
-            <div className="flex flex-col items-center gap-2 py-14 text-fg-muted">
-              <AlarmClock size={22} className="opacity-50" />
-              <div className="text-xs">{t("schedule.empty")}</div>
-              <div className="text-[11px]">{t("schedule.emptyHint")}</div>
-            </div>
-          )}
-          {tasks.map((task) => (
-            <TaskRow
-              key={task.id}
-              task={task}
-              onEdit={() => setDraft(draftFromTask(task, dailyCwd))}
-            />
-          ))}
+  if (draft) {
+    return (
+      <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
+        <div className="flex min-h-full flex-col justify-center px-8 py-8">
+          <TaskForm
+            draft={draft}
+            onChange={setDraft}
+            onCancel={() => setDraft(null)}
+            onSave={() => void submit(draft)}
+          />
         </div>
       </div>
+    );
+  }
+
+  return (
+    <div className="flex min-h-0 flex-1 flex-col">
+      <div className="flex shrink-0 items-end justify-between gap-4 px-8 pt-8">
+        <div>
+          <h1 className="font-serif-display text-[26px] leading-tight">{t("sidebar.schedule")}</h1>
+          <p className="pt-0.5 text-xs text-fg-muted">{t("schedule.subtitle")}</p>
+        </div>
+        {!empty && (
+          <button
+            type="button"
+            onClick={() => setDraft(emptyDraft(activeProjectPath))}
+            className="flex items-center gap-1.5 rounded-full bg-accent px-3.5 py-1.5 text-xs font-medium text-accent-fg transition-colors hover:bg-accent-hover"
+          >
+            <Plus size={13} /> {t("common.create")}
+          </button>
+        )}
+      </div>
+
+      {empty ? (
+        <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-3 px-8 pb-8 text-center">
+          <AlarmClock size={28} className="text-fg-muted" />
+          <div className="text-sm font-medium">{t("schedule.empty")}</div>
+          <p className="max-w-sm text-xs leading-relaxed text-fg-muted">
+            {t("schedule.emptyHint")}
+          </p>
+          <button
+            type="button"
+            onClick={() => setDraft(emptyDraft(activeProjectPath))}
+            className="flex items-center gap-1.5 rounded-full bg-accent px-4 py-2 text-xs font-medium text-accent-fg transition-colors hover:bg-accent-hover"
+          >
+            <Plus size={13} />
+            {t("schedule.create")}
+          </button>
+        </div>
+      ) : (
+        <div className="min-h-0 flex-1 overflow-y-auto px-8 pb-10 pt-6">
+          <div className="w-full max-w-2xl space-y-3">
+            {tasks.map((task) => (
+              <TaskRow
+                key={task.id}
+                task={task}
+                onEdit={() => setDraft(draftFromTask(task, dailyCwd))}
+              />
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

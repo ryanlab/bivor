@@ -1,19 +1,14 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { Archive, ChevronDown, ChevronUp, Loader2, Search, X } from "lucide-react";
 import {
-  Archive,
-  BarChart3,
-  ChevronDown,
-  ChevronUp,
-  Cpu,
-  FileJson,
-  FolderTree,
-  GitBranch,
-  Loader2,
-  Monitor,
-  Search,
-  SquareTerminal,
-  X,
-} from "lucide-react";
+  DocGlyph,
+  FilesGlyph,
+  HarnessGlyph,
+  SandboxGlyph,
+  StatsGlyph,
+  TerminalGlyph,
+  TreeGlyph,
+} from "@/components/glyphs";
 import { ApprovalCard } from "@/components/ApprovalCard";
 import { HarnessCanvas } from "@/components/HarnessCanvas";
 import { SandboxPanel } from "@/components/SandboxPanel";
@@ -204,6 +199,10 @@ function SearchBar({
   );
 }
 
+/** 顶栏图标按钮：和左侧窗口控件（WindowChrome 的 ChromeButton）同规格 */
+const headerBtn =
+  "no-drag relative inline-flex h-7 min-w-7 shrink-0 items-center justify-center gap-1 rounded-lg text-fg-muted transition-colors hover:bg-bg-hover hover:text-fg-secondary";
+
 /**
  * Context-window gauge: a live SVG ring fed by the SDK's getContextUsage()
  * (accurate across compactions, unlike summing message usage). Opens a popover
@@ -231,7 +230,7 @@ function ContextGauge({ chat }: { chat: ChatState }): React.JSX.Element {
   const pct = usage?.percent ?? null;
   const tone =
     pct === null ? "var(--t-fg-muted)" : pct >= 85 ? "var(--t-danger)" : pct >= 60 ? "var(--t-warning)" : "var(--t-accent)";
-  const R = 5.5;
+  const R = 6.5;
   const C = 2 * Math.PI * R;
   const dash = pct === null ? 0 : (Math.min(100, pct) / 100) * C;
 
@@ -241,20 +240,17 @@ function ContextGauge({ chat }: { chat: ChatState }): React.JSX.Element {
         type="button"
         title={t("chat.contextTitle")}
         onClick={() => setOpen((v) => !v)}
-        className={cn(
-          "no-drag flex items-center gap-1.5 rounded-md p-1.5 text-fg-muted transition-colors hover:bg-bg-hover hover:text-fg-secondary",
-          open && "bg-bg-hover text-fg",
-        )}
+        className={cn(headerBtn, "gap-1.5 px-1.5", open && "bg-bg-hover text-fg")}
       >
         {chat.compacting ? (
-          <Loader2 size={14} className="animate-spin text-accent" />
+          <Loader2 size={16} className="animate-spin text-accent" />
         ) : (
-          <svg width="14" height="14" viewBox="0 0 14 14" className="-rotate-90">
-            <circle cx="7" cy="7" r={R} fill="none" stroke="var(--t-border-strong)" strokeWidth="2" />
+          <svg width="16" height="16" viewBox="0 0 16 16" className="-rotate-90">
+            <circle cx="8" cy="8" r={R} fill="none" stroke="var(--t-border-strong)" strokeWidth="2" />
             {pct !== null && (
               <circle
-                cx="7"
-                cy="7"
+                cx="8"
+                cy="8"
                 r={R}
                 fill="none"
                 stroke={tone}
@@ -360,12 +356,9 @@ function StatsPopover({ chat }: { chat: ChatState }): React.JSX.Element {
         type="button"
         title={t("chat.statsTitle")}
         onClick={() => setOpen((v) => !v)}
-        className={cn(
-          "no-drag rounded-md p-1.5 text-fg-muted transition-colors hover:bg-bg-hover hover:text-fg-secondary",
-          open && "bg-bg-hover text-fg",
-        )}
+        className={cn(headerBtn, open && "bg-bg-hover text-fg")}
       >
-        <BarChart3 size={14} />
+        <StatsGlyph />
       </button>
       {open && (
         <div className="dialog-in absolute right-0 top-full z-50 mt-1.5 w-64 rounded-xl border border-border-strong bg-bg p-1 shadow-2xl">
@@ -502,12 +495,9 @@ export function ChatView({ chat }: { chat: ChatState }): React.JSX.Element {
             type="button"
             title={t("chat.files")}
             onClick={() => setFilesOpen(chat.chatId, !chat.filesOpen)}
-            className={cn(
-              "no-drag flex items-center gap-1 rounded-md p-1.5 text-fg-muted transition-colors hover:bg-bg-hover hover:text-fg-secondary",
-              chat.filesOpen && "bg-bg-hover text-fg",
-            )}
+            className={cn(headerBtn, "px-1.5", chat.filesOpen && "bg-bg-hover text-fg")}
           >
-            <FolderTree size={14} />
+            <FilesGlyph />
             {changeCount > 0 && <span className="text-[11px]">{changeCount}</span>}
           </button>
         )}
@@ -516,12 +506,9 @@ export function ChatView({ chat }: { chat: ChatState }): React.JSX.Element {
             type="button"
             title={t("chat.terminal")}
             onClick={() => setTermOpen(chat.chatId, !chat.termOpen)}
-            className={cn(
-              "no-drag relative rounded-md p-1.5 text-fg-muted transition-colors hover:bg-bg-hover hover:text-fg-secondary",
-              chat.termOpen && "bg-bg-hover text-fg",
-            )}
+            className={cn(headerBtn, chat.termOpen && "bg-bg-hover text-fg")}
           >
-            <SquareTerminal size={14} />
+            <TerminalGlyph />
             {agentBusy && (
               <span className="absolute right-0.5 top-0.5 h-1.5 w-1.5 animate-pulse rounded-full bg-success" />
             )}
@@ -532,12 +519,9 @@ export function ChatView({ chat }: { chat: ChatState }): React.JSX.Element {
             type="button"
             title={t("chat.sandbox")}
             onClick={() => setSandboxOpen(chat.chatId, !chat.sandboxOpen)}
-            className={cn(
-              "no-drag relative rounded-md p-1.5 text-fg-muted transition-colors hover:bg-bg-hover hover:text-fg-secondary",
-              chat.sandboxOpen && "bg-bg-hover text-fg",
-            )}
+            className={cn(headerBtn, chat.sandboxOpen && "bg-bg-hover text-fg")}
           >
-            <Monitor size={14} />
+            <SandboxGlyph />
             {chat.sandbox?.status === "running" && (
               <span className="absolute right-0.5 top-0.5 h-1.5 w-1.5 rounded-full bg-success" />
             )}
@@ -548,12 +532,9 @@ export function ChatView({ chat }: { chat: ChatState }): React.JSX.Element {
             type="button"
             title={t("chat.harness")}
             onClick={() => setHarnessOpen(chat.chatId, !chat.harnessOpen)}
-            className={cn(
-              "no-drag rounded-md p-1.5 text-fg-muted transition-colors hover:bg-bg-hover hover:text-fg-secondary",
-              chat.harnessOpen && "bg-bg-hover text-fg",
-            )}
+            className={cn(headerBtn, chat.harnessOpen && "bg-bg-hover text-fg")}
           >
-            <Cpu size={14} />
+            <HarnessGlyph />
           </button>
         )}
         {ui.tree && (
@@ -561,12 +542,9 @@ export function ChatView({ chat }: { chat: ChatState }): React.JSX.Element {
             type="button"
             title={t("chat.tree")}
             onClick={() => setTreeOpen(chat.chatId, !chat.treeOpen)}
-            className={cn(
-              "no-drag rounded-md p-1.5 text-fg-muted transition-colors hover:bg-bg-hover hover:text-fg-secondary",
-              chat.treeOpen && "bg-bg-hover text-fg",
-            )}
+            className={cn(headerBtn, chat.treeOpen && "bg-bg-hover text-fg")}
           >
-            <GitBranch size={14} />
+            <TreeGlyph />
           </button>
         )}
         {chat.sessionFile && (
@@ -574,9 +552,9 @@ export function ChatView({ chat }: { chat: ChatState }): React.JSX.Element {
             type="button"
             title={t("chat.revealSession")}
             onClick={() => window.pi.system.revealPath(chat.sessionFile!)}
-            className="no-drag rounded-md p-1.5 text-fg-muted transition-colors hover:bg-bg-hover hover:text-fg-secondary"
+            className={headerBtn}
           >
-            <FileJson size={14} />
+            <DocGlyph />
           </button>
         )}
       </Titlebar>

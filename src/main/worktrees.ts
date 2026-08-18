@@ -3,7 +3,7 @@
  * without touching the main working copy.
  */
 import { execFile } from "node:child_process";
-import { mkdirSync } from "node:fs";
+import { existsSync, mkdirSync } from "node:fs";
 import { homedir } from "node:os";
 import { basename, join } from "node:path";
 import { promisify } from "node:util";
@@ -39,22 +39,38 @@ function slugify(text: string): string {
   return slug || "task";
 }
 
+async function refExists(root: string, branch: string): Promise<boolean> {
+  try {
+    await git(root, "show-ref", "--verify", "--quiet", `refs/heads/${branch}`);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 export async function createWorktree(
   projectPath: string,
   taskHint?: string,
   baseBranch?: string,
 ): Promise<{ path: string; branch: string }> {
   const root = await git(projectPath, "rev-parse", "--show-toplevel");
-  const stamp = new Date().toISOString().slice(5, 16).replace(/[-:T]/g, "");
-  const slug = `${slugify(taskHint ?? "task")}-${stamp}`;
-  const branch = `pi/${slug}`;
   const container = join(homedir(), ".pi", "desktop-worktrees", basename(root));
   mkdirSync(container, { recursive: true });
-  const worktreePath = join(container, slug);
-  const args = ["worktree", "add", "-b", branch, worktreePath];
-  if (baseBranch) args.push(baseBranch);
-  await git(root, ...args);
-  return { path: worktreePath, branch };
+  const hint = slugify(taskHint ?? "task");
+
+  for (let i = 0; i < 8; i++) {
+    const stamp = new Date().toISOString().slice(5, 19).replace(/[-:T]/g, "");
+    const slug = i === 0 ? `${hint}-${stamp}` : `${hint}-${stamp}-${i + 1}`;
+    const branch = `pi/${slug}`;
+    const worktreePath = join(container, slug);
+    if (existsSync(worktreePath) || (await refExists(root, branch))) continue;
+    const args = ["worktree", "add", "-b", branch, worktreePath];
+    if (baseBranch) args.push(baseBranch);
+    await git(root, ...args);
+    return { path: worktreePath, branch };
+  }
+
+  throw new Error("无法创建并行任务：分支名冲突，请稍后重试");
 }
 
 export interface BranchList {

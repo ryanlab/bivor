@@ -177,11 +177,13 @@ interface AppState {
   providers: ProviderInfo[];
   // ui
   settingsOpen: boolean;
+  /** Which settings tab to show when the dialog opens. */
+  settingsTab?: string;
   sidebarCollapsed: boolean;
   theme: ThemePreference;
   locale: Locale;
-  /** "home" = 总览；"welcome" = 新建（选模式/项目）；"chat" = 当前会话 */
-  activeView: "home" | "welcome" | "chat";
+  /** "home" = 总览；"welcome" = 新建；"chat" = 会话；"schedule" / "deployments" = 整页 */
+  activeView: "home" | "welcome" | "chat" | "schedule" | "deployments";
   paletteOpen: boolean;
   resourcesOpen: boolean;
   /** Which resources tab to show when the dialog opens. */
@@ -189,10 +191,8 @@ interface AppState {
   usageOpen: boolean;
   monitorOpen: boolean;
   shortcutsOpen: boolean;
-  deploymentsOpen: boolean;
   // scheduled tasks
   scheduledTasks: ScheduledTask[];
-  scheduledTasksOpen: boolean;
   /** Daily chat vs coding agent workspace. */
   appMode: ChatKind;
   dailyCwd?: string;
@@ -325,7 +325,7 @@ interface AppState {
   renameSession(path: string, name: string): Promise<void>;
   deleteSession(path: string): Promise<void>;
   loadCatalog(): Promise<void>;
-  setSettingsOpen(open: boolean): void;
+  setSettingsOpen(open: boolean, tab?: string): void;
   // scheduled tasks
   setScheduledTasksOpen(open: boolean): void;
   refreshScheduledTasks(): Promise<void>;
@@ -902,9 +902,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   usageOpen: false,
   monitorOpen: false,
   shortcutsOpen: false,
-  deploymentsOpen: false,
   scheduledTasks: [],
-  scheduledTasksOpen: false,
   appMode: loadAppMode(),
   dailyCwd: undefined,
   defaultProjectCwd: undefined,
@@ -1297,7 +1295,8 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   setDeploymentsOpen(open) {
-    set({ deploymentsOpen: open });
+    if (open) set({ activeView: "deployments" });
+    else if (get().activeView === "deployments") set({ activeView: "welcome" });
   },
 
   requestHarness(chatId) {
@@ -1826,8 +1825,8 @@ export const useAppStore = create<AppState>((set, get) => ({
     }
   },
 
-  setSettingsOpen(open) {
-    set({ settingsOpen: open });
+  setSettingsOpen(open, tab) {
+    set({ settingsOpen: open, settingsTab: open ? tab : undefined });
     if (!open) {
       // Provider auth may have changed
       void get().loadCatalog();
@@ -1837,8 +1836,12 @@ export const useAppStore = create<AppState>((set, get) => ({
   // ---------- scheduled tasks ----------
 
   setScheduledTasksOpen(open) {
-    set({ scheduledTasksOpen: open });
-    if (open) void get().refreshScheduledTasks();
+    if (open) {
+      set({ activeView: "schedule" });
+      void get().refreshScheduledTasks();
+    } else if (get().activeView === "schedule") {
+      set({ activeView: "welcome" });
+    }
   },
 
   async refreshScheduledTasks() {
