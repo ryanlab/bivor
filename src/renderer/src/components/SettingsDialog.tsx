@@ -1565,19 +1565,44 @@ export function SettingsDialog(): React.JSX.Element | null {
   const open = useAppStore((s) => s.settingsOpen);
   const requestedTab = useAppStore((s) => s.settingsTab);
   const setOpen = useAppStore((s) => s.setSettingsOpen);
+  const providers = useAppStore((s) => s.providers);
   const [tab, setTab] = useState<TabId>("auth");
+  const [svcReady, setSvcReady] = useState({
+    sandbox: false,
+    web: false,
+    deploy: false,
+    bark: false,
+  });
 
   useEffect(() => {
     if (open && requestedTab && TAB_IDS.includes(requestedTab as TabId)) {
       setTab(requestedTab as TabId);
     }
   }, [open, requestedTab]);
-  const tabs: { id: TabId; label: string; icon: React.ReactNode }[] = [
-    { id: "auth", label: t("settings.tabs.auth"), icon: <KeyRound size={14} /> },
-    { id: "sandbox", label: t("settings.tabs.sandbox"), icon: <MonitorPlay size={14} /> },
-    { id: "web", label: t("settings.tabs.web"), icon: <Globe size={14} /> },
-    { id: "deploy", label: t("settings.tabs.deploy"), icon: <Rocket size={14} /> },
-    { id: "bark", label: t("settings.tabs.bark"), icon: <Smartphone size={14} /> },
+
+  useEffect(() => {
+    if (!open) return;
+    void window.pi.config.get().then((c) => {
+      setSvcReady({
+        sandbox: Boolean(c.e2bApiKey?.trim()),
+        web: Boolean(c.tavilyApiKey?.trim()),
+        deploy: Boolean(c.vercelToken?.trim()),
+        bark: Boolean(c.barkDeviceUrl?.trim()),
+      });
+    });
+  }, [open]);
+
+  const tabs: { id: TabId; label: string; icon: React.ReactNode; ready?: boolean }[] = [
+    {
+      id: "auth",
+      label: t("settings.tabs.auth"),
+      icon: <KeyRound size={14} />,
+      ready: providers.some((p) => p.authenticated),
+    },
+    { id: "sandbox", label: t("settings.tabs.sandbox"), icon: <MonitorPlay size={14} />, ready: svcReady.sandbox },
+    { id: "web", label: t("settings.tabs.web"), icon: <Globe size={14} />, ready: svcReady.web },
+    { id: "deploy", label: t("settings.tabs.deploy"), icon: <Rocket size={14} />, ready: svcReady.deploy },
+    { id: "bark", label: t("settings.tabs.bark"), icon: <Smartphone size={14} />, ready: svcReady.bark },
     { id: "appearance", label: t("settings.tabs.appearance"), icon: <Palette size={14} /> },
     { id: "pi", label: t("settings.tabs.pi"), icon: <Bot size={14} /> },
     { id: "about", label: t("settings.tabs.about"), icon: <Info size={14} /> },
@@ -1611,7 +1636,15 @@ export function SettingsDialog(): React.JSX.Element | null {
                 )}
               >
                 {item.icon}
-                {item.label}
+                <span className="min-w-0 flex-1 truncate">{item.label}</span>
+                {item.ready !== undefined && (
+                  <span
+                    className={cn(
+                      "h-1.5 w-1.5 shrink-0 rounded-full",
+                      item.ready ? "bg-success" : "bg-border-strong",
+                    )}
+                  />
+                )}
               </button>
             ))}
           </div>
