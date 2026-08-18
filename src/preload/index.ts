@@ -38,6 +38,7 @@ import type {
   VercelProjectInfo,
   VercelTestResult,
   ApiKeyTestResult,
+  CustomProviderDraft,
   SandboxStatusPayload,
   UpdateCheckPayload,
 } from "@shared/protocol";
@@ -74,6 +75,13 @@ const api = {
       ipcRenderer.invoke(IPC.setApiKey, providerId, key),
     removeApiKey: (providerId: string): Promise<void> =>
       ipcRenderer.invoke(IPC.removeApiKey, providerId),
+    test: (opts: { providerId: string; apiKey: string }): Promise<ApiKeyTestResult> =>
+      ipcRenderer.invoke(IPC.testApiKey, opts),
+    testEndpoint: (opts: { baseUrl: string; apiKey: string }): Promise<ApiKeyTestResult> =>
+      ipcRenderer.invoke(IPC.testCustomEndpoint, opts),
+    saveCustom: (draft: CustomProviderDraft): Promise<void> =>
+      ipcRenderer.invoke(IPC.saveCustomProvider, draft),
+    removeCustom: (id: string): Promise<void> => ipcRenderer.invoke(IPC.removeCustomProvider, id),
   },
   config: {
     get: (): Promise<AppConfigPayload> => ipcRenderer.invoke(IPC.configGet),

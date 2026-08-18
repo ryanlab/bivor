@@ -29,6 +29,16 @@ export interface ProviderInfo {
   /** Source of credentials if authenticated: "env" | "stored" | "runtime" | undefined */
   authSource?: string;
   envVar?: string;
+  /** Defined in ~/.pi/agent/models.json with its own model list */
+  custom?: boolean;
+}
+
+export interface CustomProviderDraft {
+  id: string;
+  name?: string;
+  baseUrl: string;
+  apiKey?: string;
+  modelIds: string[];
 }
 
 export interface UsageSnapshot {
@@ -827,6 +837,10 @@ export const IPC = {
   listProviders: "providers:list",
   setApiKey: "providers:setApiKey",
   removeApiKey: "providers:removeApiKey",
+  testApiKey: "providers:testApiKey",
+  testCustomEndpoint: "providers:testCustomEndpoint",
+  saveCustomProvider: "providers:saveCustom",
+  removeCustomProvider: "providers:removeCustom",
   listSessions: "sessions:list",
   renameSession: "sessions:rename",
   deleteSession: "sessions:delete",

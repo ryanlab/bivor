@@ -3,7 +3,7 @@ import { existsSync, mkdirSync, statSync } from "node:fs";
 import { homedir, release } from "node:os";
 import { dirname, join } from "node:path";
 import { app, BrowserWindow, dialog, ipcMain, shell } from "electron";
-import type { ChatCreateOptions, HostCommand, ScheduledTask } from "@shared/protocol";
+import type { ChatCreateOptions, CustomProviderDraft, HostCommand, ScheduledTask } from "@shared/protocol";
 import { IPC } from "@shared/protocol";
 import { TITLEBAR_HEIGHT } from "@shared/titlebar";
 import { createChat, disposeAllChats, disposeChat, sendChatCommand } from "./chats";
@@ -109,8 +109,12 @@ import {
   searchSessions,
   usageStats,
   removeApiKey,
+  removeCustomProvider,
   renameSession,
+  saveCustomProvider,
   setApiKey,
+  testApiKey,
+  testCustomEndpoint,
 } from "./services";
 
 const isDev = !app.isPackaged;
@@ -246,6 +250,16 @@ function registerIpc(): void {
   ipcMain.handle(IPC.listProviders, () => listProviders());
   ipcMain.handle(IPC.setApiKey, (_e, providerId: string, key: string) => setApiKey(providerId, key));
   ipcMain.handle(IPC.removeApiKey, (_e, providerId: string) => removeApiKey(providerId));
+  ipcMain.handle(IPC.testApiKey, (_e, opts: { providerId: string; apiKey: string }) =>
+    testApiKey(opts.providerId, opts.apiKey),
+  );
+  ipcMain.handle(IPC.testCustomEndpoint, (_e, opts: { baseUrl: string; apiKey: string }) =>
+    testCustomEndpoint(opts),
+  );
+  ipcMain.handle(IPC.saveCustomProvider, (_e, draft: CustomProviderDraft) =>
+    saveCustomProvider(draft),
+  );
+  ipcMain.handle(IPC.removeCustomProvider, (_e, id: string) => removeCustomProvider(id));
   ipcMain.handle(IPC.listSessions, (_e, cwd?: string) => listSessions(cwd));
   ipcMain.handle(IPC.searchSessions, (_e, cwd: string, query: string) =>
     searchSessions(cwd, query),

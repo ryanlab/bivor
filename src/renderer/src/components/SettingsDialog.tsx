@@ -14,6 +14,7 @@ import {
   MonitorPlay,
   Moon,
   Palette,
+  Plus,
   Rocket,
   RotateCcw,
   Scale,
@@ -136,6 +137,48 @@ function OAuthFlowPanel({
   );
 }
 
+type ProbeResult = { ok: true; detail?: string } | { ok: false; error?: string };
+
+/** Persist only after a live probe succeeds. Empty input skips the probe (clears the key). */
+function saveAfterProbe(opts: {
+  skipProbe: boolean;
+  probe: () => Promise<ProbeResult>;
+  persist: () => Promise<unknown>;
+  onClose: () => void;
+  setBusy: (busy: boolean) => void;
+  setMsg: (msg: { ok: boolean; text: string } | null) => void;
+  missing: string;
+  success: (detail?: string) => string;
+  failed: string;
+}): void {
+  void (async () => {
+    if (opts.skipProbe) {
+      await opts.persist();
+      opts.onClose();
+      return;
+    }
+    opts.setBusy(true);
+    opts.setMsg(null);
+    try {
+      const r = await opts.probe();
+      if (!r.ok) {
+        opts.setMsg({
+          ok: false,
+          text: r.error === "missing" ? opts.missing : (r.error ?? opts.failed),
+        });
+        return;
+      }
+      opts.setMsg({ ok: true, text: opts.success(r.detail) });
+      await opts.persist();
+      opts.onClose();
+    } catch (err) {
+      opts.setMsg({ ok: false, text: err instanceof Error ? err.message : opts.failed });
+    } finally {
+      opts.setBusy(false);
+    }
+  })();
+}
+
 // ---------- Provider row ----------
 
 function ProviderRow({ provider }: { provider: ProviderInfo }): React.JSX.Element {
@@ -144,8 +187,11 @@ function ProviderRow({ provider }: { provider: ProviderInfo }): React.JSX.Elemen
   const [expanded, setExpanded] = useState(false);
   const [key, setKey] = useState("");
   const [busy, setBusy] = useState(false);
+  const [testing, setTesting] = useState(false);
   const [error, setError] = useState<string>();
+  const [testMsg, setTestMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const [flow, setFlow] = useState<FlowState>();
+  const locked = busy || testing;
 
   useEffect(() => {
     if (!flow) return;
@@ -188,7 +234,18 @@ function ProviderRow({ provider }: { provider: ProviderInfo }): React.JSX.Elemen
     if (!key.trim()) return;
     setBusy(true);
     setError(undefined);
+    setTestMsg(null);
     try {
+      const probe = await window.pi.providers.test({
+        providerId: provider.id,
+        apiKey: key.trim(),
+      });
+      if (!probe.ok) {
+        setError(
+          probe.error === "missing" ? t("settings.authProviderMissing") : (probe.error ?? t("common.failed")),
+        );
+        return;
+      }
       await window.pi.providers.setApiKey(provider.id, key.trim());
       setKey("");
       setExpanded(false);
@@ -197,6 +254,26 @@ function ProviderRow({ provider }: { provider: ProviderInfo }): React.JSX.Elemen
       setError(ipcErrorMessage(err));
     } finally {
       setBusy(false);
+    }
+  };
+
+  const testKey = async (): Promise<void> => {
+    if (!key.trim()) return;
+    setTesting(true);
+    setError(undefined);
+    setTestMsg(null);
+    try {
+      const r = await window.pi.providers.test({ providerId: provider.id, apiKey: key.trim() });
+      if (r.ok) {
+        setTestMsg({ ok: true, text: t("common.success") });
+        return;
+      }
+      setTestMsg({
+        ok: false,
+        text: r.error === "missing" ? t("settings.authProviderMissing") : (r.error ?? t("common.failed")),
+      });
+    } finally {
+      setTesting(false);
     }
   };
 
@@ -232,6 +309,11 @@ function ProviderRow({ provider }: { provider: ProviderInfo }): React.JSX.Elemen
           )}
         />
         <span className="min-w-0 flex-1 truncate text-[13px]">{provider.name}</span>
+        {provider.custom && (
+          <span className="rounded-md bg-bg-tertiary px-1.5 py-0.5 text-[10px] text-fg-muted">
+            {t("settings.authCustomBadge")}
+          </span>
+        )}
         {provider.auth.includes("oauth") && (
           <span className="rounded-md bg-bg-tertiary px-1.5 py-0.5 text-[10px] text-fg-muted">
             {t("settings.oauthSupported")}
@@ -248,7 +330,10 @@ function ProviderRow({ provider }: { provider: ProviderInfo }): React.JSX.Elemen
             <input
               type="password"
               value={key}
-              onChange={(e) => setKey(e.target.value)}
+              onChange={(e) => {
+                setKey(e.target.value);
+                setTestMsg(null);
+              }}
               onKeyDown={(e) => {
                 if (e.key === "Enter") void save();
               }}
@@ -261,8 +346,30 @@ function ProviderRow({ provider }: { provider: ProviderInfo }): React.JSX.Elemen
             />
             <button
               type="button"
+              disabled={locked || !key.trim()}
+              onClick={() => void testKey()}
+              className={cn(
+                "relative inline-flex h-[30px] shrink-0 items-center justify-center rounded-lg border px-3 text-xs font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-40",
+                testMsg?.ok
+                  ? "border-success/50 text-success"
+                  : "border-fg-muted text-fg-secondary hover:border-fg-secondary hover:bg-bg-hover hover:text-fg",
+              )}
+            >
+              <span className="invisible whitespace-nowrap" aria-hidden>
+                {t("settings.authProviderTesting")}
+              </span>
+              <span className="absolute inset-0 flex items-center justify-center">
+                {testing
+                  ? t("settings.authProviderTesting")
+                  : testMsg?.ok
+                    ? t("common.success")
+                    : t("settings.authProviderTest")}
+              </span>
+            </button>
+            <button
+              type="button"
               onClick={() => void save()}
-              disabled={busy || !key.trim()}
+              disabled={locked || !key.trim()}
               className="flex items-center gap-1 rounded-lg bg-accent px-3 py-1.5 text-xs font-medium text-accent-fg transition-colors hover:bg-accent-hover disabled:opacity-40"
             >
               {busy ? <Loader2 size={12} className="animate-spin" /> : <Check size={12} />}
@@ -273,7 +380,7 @@ function ProviderRow({ provider }: { provider: ProviderInfo }): React.JSX.Elemen
                 type="button"
                 title={t("settings.removeCreds")}
                 onClick={() => void remove()}
-                disabled={busy}
+                disabled={locked}
                 className="rounded-lg border border-border px-2 py-1.5 text-fg-muted transition-colors hover:border-danger/50 hover:text-danger disabled:opacity-40"
               >
                 <Trash2 size={13} />
@@ -281,14 +388,17 @@ function ProviderRow({ provider }: { provider: ProviderInfo }): React.JSX.Elemen
             )}
           </div>
           {provider.auth.includes("oauth") && !flow && (
-            <button
-              type="button"
-              onClick={() => void startOAuth()}
-              className="mt-2 flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-xs text-fg-secondary transition-colors hover:border-accent/50 hover:text-accent"
-            >
-              <LogIn size={12} />
-              {t("settings.oauthLogin")}
-            </button>
+            <div className="mt-2 flex items-center gap-2">
+              <span className="shrink-0 text-xs text-fg-muted">{t("settings.oauthOr")}</span>
+              <button
+                type="button"
+                onClick={() => void startOAuth()}
+                className="flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-xs text-fg-secondary transition-colors hover:border-accent/50 hover:text-accent"
+              >
+                <LogIn size={12} />
+                {t("settings.oauthLogin")}
+              </button>
+            </div>
           )}
           {flow && (
             <OAuthFlowPanel
@@ -298,8 +408,25 @@ function ProviderRow({ provider }: { provider: ProviderInfo }): React.JSX.Elemen
             />
           )}
           {error && <div className="mt-2 text-xs text-danger">{error}</div>}
-          {!error && (
+          {testMsg && !error && (
+            <p className={cn("mt-2 text-xs", testMsg.ok ? "text-success" : "text-danger")}>
+              {testMsg.text}
+            </p>
+          )}
+          {!error && !testMsg && (
             <div className="mt-2 text-[11px] text-fg-muted">{t("settings.keyVerifyHint")}</div>
+          )}
+          {provider.custom && (
+            <button
+              type="button"
+              disabled={locked}
+              onClick={() => {
+                void window.pi.providers.removeCustom(provider.id).then(() => loadCatalog());
+              }}
+              className="mt-2 text-[11px] text-fg-muted transition-colors hover:text-danger"
+            >
+              {t("settings.authCustomRemove")}
+            </button>
           )}
         </div>
       )}
@@ -309,16 +436,203 @@ function ProviderRow({ provider }: { provider: ProviderInfo }): React.JSX.Elemen
 
 // ---------- Tabs ----------
 
+function CustomProviderPanel({ onClose }: { onClose: () => void }): React.JSX.Element {
+  const t = useT();
+  const loadCatalog = useAppStore((s) => s.loadCatalog);
+  const [id, setId] = useState("");
+  const [name, setName] = useState("");
+  const [baseUrl, setBaseUrl] = useState("");
+  const [apiKey, setApiKey] = useState("");
+  const [modelsText, setModelsText] = useState("");
+  const [testing, setTesting] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [testMsg, setTestMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  const busy = testing || saving;
+  const modelIds = modelsText
+    .split(/[\n,]+/)
+    .map((s) => s.trim())
+    .filter(Boolean);
+
+  const field = "w-full rounded-lg border border-border bg-bg-input px-2.5 py-1.5 text-xs outline-none focus:border-accent";
+  const actionBtn =
+    "relative box-border inline-flex h-8 shrink-0 items-center justify-center rounded-lg border px-3 text-xs font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-40";
+  const actionInner = (label: string) => (
+    <>
+      <span className="invisible whitespace-nowrap" aria-hidden>
+        {t("settings.verifying")}
+      </span>
+      <span className="absolute inset-0 flex items-center justify-center">{label}</span>
+    </>
+  );
+
+  return (
+    <div className="space-y-3 rounded-xl border border-border bg-bg px-3.5 py-3">
+      <div className="text-xs font-medium text-fg-secondary">{t("settings.authCustomTitle")}</div>
+      <input
+        value={id}
+        onChange={(e) => setId(e.target.value)}
+        placeholder={t("settings.authCustomId")}
+        disabled={busy}
+        className={field}
+      />
+      <input
+        value={name}
+        onChange={(e) => setName(e.target.value)}
+        placeholder={t("settings.authCustomName")}
+        disabled={busy}
+        className={field}
+      />
+      <input
+        value={baseUrl}
+        onChange={(e) => {
+          setBaseUrl(e.target.value);
+          setTestMsg(null);
+        }}
+        placeholder="https://api.example.com/v1"
+        disabled={busy}
+        className={`${field} font-mono`}
+      />
+      <input
+        type="password"
+        value={apiKey}
+        onChange={(e) => {
+          setApiKey(e.target.value);
+          setTestMsg(null);
+        }}
+        placeholder={t("settings.apiKey")}
+        disabled={busy}
+        className={field}
+      />
+      <textarea
+        value={modelsText}
+        onChange={(e) => setModelsText(e.target.value)}
+        placeholder={t("settings.authCustomModels")}
+        disabled={busy}
+        rows={3}
+        className={`${field} resize-none font-mono`}
+      />
+      <p className="text-[11px] text-fg-muted">{t("settings.authCustomHint")}</p>
+      <div className="flex flex-wrap items-center gap-2">
+        <button
+          type="button"
+          disabled={busy || !baseUrl.trim() || !apiKey.trim()}
+          onClick={() => {
+            setTesting(true);
+            setTestMsg(null);
+            void window.pi.providers
+              .testEndpoint({ baseUrl: baseUrl.trim(), apiKey: apiKey.trim() })
+              .then((r) => {
+                setTestMsg({
+                  ok: r.ok,
+                  text: r.ok
+                    ? t("common.success")
+                    : r.error === "missing"
+                      ? t("settings.authProviderMissing")
+                      : (r.error ?? t("common.failed")),
+                });
+              })
+              .finally(() => setTesting(false));
+          }}
+          className={cn(
+            actionBtn,
+            testMsg?.ok
+              ? "border-success/50 text-success"
+              : "border-fg-muted text-fg-secondary hover:border-fg-secondary hover:bg-bg-hover hover:text-fg",
+          )}
+        >
+          {actionInner(
+            testing
+              ? t("settings.authProviderTesting")
+              : testMsg?.ok
+                ? t("common.success")
+                : t("settings.authProviderTest"),
+          )}
+        </button>
+        <button
+          type="button"
+          disabled={busy || !id.trim() || !baseUrl.trim() || modelIds.length === 0}
+          onClick={() => {
+            saveAfterProbe({
+              skipProbe: !apiKey.trim(),
+              probe: () =>
+                window.pi.providers.testEndpoint({
+                  baseUrl: baseUrl.trim(),
+                  apiKey: apiKey.trim(),
+                }),
+              persist: () =>
+                window.pi.providers.saveCustom({
+                  id: id.trim(),
+                  name: name.trim() || undefined,
+                  baseUrl: baseUrl.trim(),
+                  apiKey: apiKey.trim() || undefined,
+                  modelIds,
+                }),
+              onClose: () => {
+                void loadCatalog();
+                onClose();
+              },
+              setBusy: setSaving,
+              setMsg: setTestMsg,
+              missing: t("settings.authProviderMissing"),
+              success: () => t("common.success"),
+              failed: t("common.failed"),
+            });
+          }}
+          className={cn(actionBtn, "border-accent bg-accent text-accent-fg hover:bg-accent-hover")}
+        >
+          {actionInner(saving ? t("settings.verifying") : t("common.save"))}
+        </button>
+        <button
+          type="button"
+          disabled={busy}
+          onClick={onClose}
+          className={cn(
+            actionBtn,
+            "border-border text-fg-secondary hover:border-fg-secondary hover:bg-bg-hover hover:text-fg",
+          )}
+        >
+          {actionInner(t("common.cancel"))}
+        </button>
+      </div>
+      {testMsg && (
+        <p className={cn("text-xs", testMsg.ok ? "text-success" : "text-danger")}>{testMsg.text}</p>
+      )}
+    </div>
+  );
+}
+
 function AuthTab(): React.JSX.Element {
   const t = useT();
   const providers = useAppStore((s) => s.providers);
+  const models = useAppStore((s) => s.models);
+  const [customOpen, setCustomOpen] = useState(false);
+  const ready = providers.filter((p) => p.authenticated).length;
+  const authed = new Set(providers.filter((p) => p.authenticated).map((p) => p.id));
+  const usable = models.filter((m) => authed.has(m.provider)).length;
   return (
-    <div>
-      <p className="pb-3 text-xs leading-relaxed text-fg-muted">
-        {t("settings.authIntro", { path: "\0" }).split("\0")[0]}
-        <PathReveal path={PI_AUTH} />
-        {t("settings.authIntro", { path: "\0" }).split("\0")[1]}
-      </p>
+    <div className="space-y-4">
+      <div className="flex items-center justify-between gap-3">
+        <div className="min-w-0">
+          <div className="text-sm font-medium">{t("settings.authTitle")}</div>
+          {providers.length > 0 && (
+            <p className="pt-0.5 text-xs text-fg-muted">
+              {t("settings.authStats", { ready, total: providers.length, models: usable })}
+            </p>
+          )}
+        </div>
+        <button
+          type="button"
+          onClick={() => setCustomOpen((v) => !v)}
+          className={cn(
+            "inline-flex h-8 shrink-0 items-center gap-1.5 rounded-xl px-3.5 text-xs font-medium text-accent-fg transition-colors",
+            customOpen ? "bg-accent-hover" : "bg-accent hover:bg-accent-hover",
+          )}
+        >
+          <Plus size={13} />
+          {t("settings.authCustom")}
+        </button>
+      </div>
+      {customOpen && <CustomProviderPanel onClose={() => setCustomOpen(false)} />}
       <div className="space-y-2">
         {providers.length === 0 && (
           <div className="py-6 text-center text-xs text-fg-muted">
@@ -420,7 +734,9 @@ function SandboxTab(): React.JSX.Element {
   const [key, setKey] = useState("");
   const [loaded, setLoaded] = useState(false);
   const [testing, setTesting] = useState(false);
+  const [saving, setSaving] = useState(false);
   const [testMsg, setTestMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  const busy = testing || saving;
 
   useEffect(() => {
     void window.pi.config.get().then((c) => {
@@ -462,7 +778,7 @@ function SandboxTab(): React.JSX.Element {
           />
           <button
             type="button"
-            disabled={!loaded || testing || !key.trim()}
+            disabled={!loaded || busy || !key.trim()}
             onClick={() => {
               setTesting(true);
               setTestMsg(null);
@@ -523,14 +839,25 @@ function SandboxTab(): React.JSX.Element {
       <div className="flex items-center gap-2">
         <button
           type="button"
+          disabled={!loaded || busy}
           onClick={() => {
-            void window.pi.config.set({ e2bApiKey: key.trim() || undefined }).then(() => {
-              setSettingsOpen(false);
+            const trimmed = key.trim();
+            saveAfterProbe({
+              skipProbe: !trimmed,
+              probe: () => window.pi.e2b.test({ apiKey: trimmed }),
+              persist: () => window.pi.config.set({ e2bApiKey: trimmed || undefined }),
+              onClose: () => setSettingsOpen(false),
+              setBusy: setSaving,
+              setMsg: setTestMsg,
+              missing: t("settings.e2bMissing"),
+              success: (detail) =>
+                detail ? t("settings.e2bVerified", { detail }) : t("common.success"),
+              failed: t("common.failed"),
             });
           }}
-          className="rounded-lg bg-accent px-3 py-1.5 text-xs font-medium text-accent-fg hover:bg-accent-hover"
+          className="rounded-lg bg-accent px-3 py-1.5 text-xs font-medium text-accent-fg hover:bg-accent-hover disabled:cursor-not-allowed disabled:opacity-40"
         >
-          {t("common.save")}
+          {saving ? t("settings.verifying") : t("common.save")}
         </button>
       </div>
       {testMsg && (
@@ -546,7 +873,9 @@ function WebTab(): React.JSX.Element {
   const [key, setKey] = useState("");
   const [loaded, setLoaded] = useState(false);
   const [testing, setTesting] = useState(false);
+  const [saving, setSaving] = useState(false);
   const [testMsg, setTestMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  const busy = testing || saving;
 
   useEffect(() => {
     void window.pi.config.get().then((c) => {
@@ -588,7 +917,7 @@ function WebTab(): React.JSX.Element {
           />
           <button
             type="button"
-            disabled={!loaded || testing || !key.trim()}
+            disabled={!loaded || busy || !key.trim()}
             onClick={() => {
               setTesting(true);
               setTestMsg(null);
@@ -649,14 +978,25 @@ function WebTab(): React.JSX.Element {
       <div className="flex items-center gap-2">
         <button
           type="button"
+          disabled={!loaded || busy}
           onClick={() => {
-            void window.pi.config.set({ tavilyApiKey: key.trim() || undefined }).then(() => {
-              setSettingsOpen(false);
+            const trimmed = key.trim();
+            saveAfterProbe({
+              skipProbe: !trimmed,
+              probe: () => window.pi.tavily.test({ apiKey: trimmed }),
+              persist: () => window.pi.config.set({ tavilyApiKey: trimmed || undefined }),
+              onClose: () => setSettingsOpen(false),
+              setBusy: setSaving,
+              setMsg: setTestMsg,
+              missing: t("settings.tavilyMissing"),
+              success: (detail) =>
+                detail ? t("settings.tavilyVerified", { detail }) : t("common.success"),
+              failed: t("common.failed"),
             });
           }}
-          className="rounded-lg bg-accent px-3 py-1.5 text-xs font-medium text-accent-fg hover:bg-accent-hover"
+          className="rounded-lg bg-accent px-3 py-1.5 text-xs font-medium text-accent-fg hover:bg-accent-hover disabled:cursor-not-allowed disabled:opacity-40"
         >
-          {t("common.save")}
+          {saving ? t("settings.verifying") : t("common.save")}
         </button>
       </div>
       {testMsg && (
@@ -673,7 +1013,9 @@ function DeployTab(): React.JSX.Element {
   const [teamId, setTeamId] = useState("");
   const [loaded, setLoaded] = useState(false);
   const [testing, setTesting] = useState(false);
+  const [saving, setSaving] = useState(false);
   const [testMsg, setTestMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  const busy = testing || saving;
 
   useEffect(() => {
     void window.pi.config.get().then((c) => {
@@ -716,7 +1058,7 @@ function DeployTab(): React.JSX.Element {
           />
           <button
             type="button"
-            disabled={!loaded || testing || !token.trim()}
+            disabled={!loaded || busy || !token.trim()}
             onClick={() => {
               setTesting(true);
               setTestMsg(null);
@@ -791,19 +1133,38 @@ function DeployTab(): React.JSX.Element {
       <div className="flex items-center gap-2">
         <button
           type="button"
+          disabled={!loaded || busy}
           onClick={() => {
-            void window.pi.config
-              .set({
-                vercelToken: token.trim() || undefined,
-                vercelTeamId: teamId.trim() || undefined,
-              })
-              .then(() => {
-                setSettingsOpen(false);
-              });
+            const trimmed = token.trim();
+            const team = teamId.trim();
+            saveAfterProbe({
+              skipProbe: !trimmed,
+              probe: () =>
+                window.pi.deployments.test({ token: trimmed, teamId: team }).then((r) =>
+                  r.ok
+                    ? {
+                        ok: true as const,
+                        detail: [r.username, r.teamName].filter(Boolean).join(" · ") || undefined,
+                      }
+                    : { ok: false as const, error: r.error },
+                ),
+              persist: () =>
+                window.pi.config.set({
+                  vercelToken: trimmed || undefined,
+                  vercelTeamId: team || undefined,
+                }),
+              onClose: () => setSettingsOpen(false),
+              setBusy: setSaving,
+              setMsg: setTestMsg,
+              missing: t("settings.vercelMissing"),
+              success: (detail) =>
+                detail ? t("settings.vercelVerified", { who: detail }) : t("common.success"),
+              failed: t("common.failed"),
+            });
           }}
-          className="rounded-lg bg-accent px-3 py-1.5 text-xs font-medium text-accent-fg hover:bg-accent-hover"
+          className="rounded-lg bg-accent px-3 py-1.5 text-xs font-medium text-accent-fg hover:bg-accent-hover disabled:cursor-not-allowed disabled:opacity-40"
         >
-          {t("common.save")}
+          {saving ? t("settings.verifying") : t("common.save")}
         </button>
       </div>
       {testMsg && (
@@ -1236,22 +1597,24 @@ export function SettingsDialog(): React.JSX.Element | null {
         {/* Left nav */}
         <div className="flex w-52 shrink-0 flex-col border-r border-border bg-bg-tertiary/50 p-2">
           <div className="px-2.5 pb-2 pt-1.5 text-[13px] font-semibold">{t("settings.title")}</div>
-          {tabs.map((item) => (
-            <button
-              key={item.id}
-              type="button"
-              onClick={() => setTab(item.id)}
-              className={cn(
-                "flex items-center gap-2 rounded-lg px-2.5 py-2 text-left text-xs transition-colors",
-                tab === item.id
-                  ? "bg-bg-hover font-medium text-fg"
-                  : "text-fg-secondary hover:bg-bg-hover/60",
-              )}
-            >
-              {item.icon}
-              {item.label}
-            </button>
-          ))}
+          <div className="flex flex-col gap-1">
+            {tabs.map((item) => (
+              <button
+                key={item.id}
+                type="button"
+                onClick={() => setTab(item.id)}
+                className={cn(
+                  "flex items-center gap-2 rounded-lg px-2.5 py-2 text-left text-xs transition-colors",
+                  tab === item.id
+                    ? "bg-bg-hover font-medium text-fg"
+                    : "text-fg-secondary hover:bg-bg-hover/60",
+                )}
+              >
+                {item.icon}
+                {item.label}
+              </button>
+            ))}
+          </div>
         </div>
 
         {/* Content */}

@@ -2,9 +2,13 @@
  * Global services in the main process: model catalog, provider auth,
  * session listing. Uses the pi SDK directly.
  */
-import { readFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { homedir } from "node:os";
+import { dirname, join } from "node:path";
 import { ModelRuntime, SessionManager } from "@earendil-works/pi-coding-agent";
 import type {
+  ApiKeyTestResult,
+  CustomProviderDraft,
   ModelInfo,
   ProviderInfo,
   SessionListItem,
@@ -70,6 +74,7 @@ export async function listProviders(): Promise<ProviderInfo[]> {
       authenticated,
       authSource,
       envVar: (p as { env?: { apiKey?: string } }).env?.apiKey,
+      custom: isCustomProviderId(p.id),
     });
   }
   return result;
@@ -100,16 +105,33 @@ async function verifyProvider(runtime: ModelRuntime, providerId: string): Promis
   const signal = AbortSignal.timeout(10000);
   const resolved = await runtime.getAuth(providerId, { signal });
   if (!resolved) throw new Error("未能读取刚保存的凭证");
+  const extraHeaders: Record<string, string> = {};
+  for (const [k, v] of Object.entries(resolved.auth.headers ?? {})) {
+    if (typeof v === "string") extraHeaders[k] = v;
+  }
+  await probeModelsHttp({
+    providerId,
+    baseUrl: resolved.auth.baseUrl ?? provider.baseUrl,
+    apiKey: resolved.auth.apiKey,
+    extraHeaders,
+  });
+}
 
-  const baseUrl = (resolved.auth.baseUrl ?? provider.baseUrl ?? "").replace(/\/+$/, "");
+async function probeModelsHttp(opts: {
+  providerId: string;
+  baseUrl?: string;
+  apiKey?: string;
+  extraHeaders?: Record<string, string>;
+}): Promise<void> {
+  const baseUrl = (opts.baseUrl ?? "").replace(/\/+$/, "");
   if (!baseUrl) return;
-
   const headers: Record<string, string> = {
     Accept: "application/json",
-    ...(resolved.auth.headers ?? {}),
+    ...opts.extraHeaders,
   };
-  const key = resolved.auth.apiKey;
+  const key = opts.apiKey;
   let url = `${baseUrl}/models`;
+  const providerId = opts.providerId;
 
   if (providerId === "google" || providerId.startsWith("google-")) {
     if (key) url += `${url.includes("?") ? "&" : "?"}key=${encodeURIComponent(key)}`;
@@ -123,7 +145,7 @@ async function verifyProvider(runtime: ModelRuntime, providerId: string): Promis
 
   let res: Response;
   try {
-    res = await fetch(url, { headers, signal });
+    res = await fetch(url, { headers, signal: AbortSignal.timeout(10000) });
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     if (/abort|timeout/i.test(msg)) throw new Error("连通超时，请检查网络后重试");
@@ -136,6 +158,143 @@ async function verifyProvider(runtime: ModelRuntime, providerId: string): Promis
   if (res.status >= 500) {
     throw new Error(`服务暂时不可用（HTTP ${res.status}）`);
   }
+}
+
+function catchProbe(err: unknown): ApiKeyTestResult {
+  const message = err instanceof Error ? err.message : String(err);
+  return { ok: false, error: message };
+}
+
+/** Probe a key without writing auth.json. */
+export async function testApiKey(providerId: string, apiKey: string): Promise<ApiKeyTestResult> {
+  const key = apiKey.trim();
+  if (!key) return { ok: false, error: "missing" };
+  try {
+    const runtime = await getRuntime();
+    const provider = runtime.getProvider(providerId);
+    if (!provider) return { ok: false, error: "未知提供商" };
+    await probeModelsHttp({ providerId, baseUrl: provider.baseUrl, apiKey: key });
+    return { ok: true };
+  } catch (err) {
+    return catchProbe(err);
+  }
+}
+
+export async function testCustomEndpoint(opts: {
+  baseUrl: string;
+  apiKey: string;
+}): Promise<ApiKeyTestResult> {
+  const baseUrl = opts.baseUrl.trim();
+  const apiKey = opts.apiKey.trim();
+  if (!baseUrl) return { ok: false, error: "missing" };
+  if (!apiKey) return { ok: false, error: "missing" };
+  try {
+    await probeModelsHttp({ providerId: "custom", baseUrl, apiKey });
+    return { ok: true };
+  } catch (err) {
+    return catchProbe(err);
+  }
+}
+
+function modelsJsonPath(): string {
+  const envDir = process.env.PI_CODING_AGENT_DIR?.trim();
+  const dir = envDir || join(homedir(), ".pi", "agent");
+  return join(dir, "models.json");
+}
+
+interface ModelsJsonFile {
+  providers?: Record<string, Record<string, unknown>>;
+}
+
+function parseModelsJson(raw: string): ModelsJsonFile {
+  try {
+    return JSON.parse(raw) as ModelsJsonFile;
+  } catch {
+    const stripped = raw.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
+    return JSON.parse(stripped) as ModelsJsonFile;
+  }
+}
+
+function readModelsJson(): ModelsJsonFile {
+  const path = modelsJsonPath();
+  if (!existsSync(path)) return { providers: {} };
+  return parseModelsJson(readFileSync(path, "utf8"));
+}
+
+function isCustomProviderId(id: string): boolean {
+  try {
+    const models = readModelsJson().providers?.[id]?.models;
+    return Array.isArray(models) && models.length > 0;
+  } catch {
+    return false;
+  }
+}
+
+async function reloadRuntime(): Promise<ModelRuntime> {
+  const current = runtimePromise;
+  if (current) {
+    try {
+      const runtime = await current;
+      await runtime.refresh();
+      return runtime;
+    } catch {
+      runtimePromise = undefined;
+    }
+  }
+  return getRuntime();
+}
+
+export async function saveCustomProvider(draft: CustomProviderDraft): Promise<void> {
+  const id = draft.id.trim();
+  const baseUrl = draft.baseUrl.trim().replace(/\/+$/, "");
+  const modelIds = draft.modelIds.map((m) => m.trim()).filter(Boolean);
+  if (!/^[a-zA-Z][a-zA-Z0-9_-]{0,63}$/.test(id)) {
+    throw new Error("Provider ID 只能包含字母、数字、下划线和连字符");
+  }
+  if (!baseUrl) throw new Error("请填写 Base URL");
+  if (modelIds.length === 0) throw new Error("请至少填写一个模型 ID");
+
+  let file: ModelsJsonFile;
+  try {
+    file = readModelsJson();
+  } catch {
+    throw new Error("models.json 无法解析，请先修复该文件");
+  }
+  file.providers ??= {};
+  const key = draft.apiKey?.trim();
+  file.providers[id] = {
+    name: draft.name?.trim() || id,
+    baseUrl,
+    api: "openai-completions",
+    ...(key ? {} : { apiKey: "custom" }),
+    compat: { supportsDeveloperRole: false, supportsReasoningEffort: false },
+    models: modelIds.map((modelId) => ({ id: modelId })),
+  };
+
+  const path = modelsJsonPath();
+  mkdirSync(dirname(path), { recursive: true });
+  writeFileSync(path, `${JSON.stringify(file, null, 2)}\n`, "utf8");
+  await reloadRuntime();
+  if (key) await setApiKey(id, key);
+}
+
+export async function removeCustomProvider(id: string): Promise<void> {
+  let file: ModelsJsonFile;
+  try {
+    file = readModelsJson();
+  } catch {
+    throw new Error("models.json 无法解析，请先修复该文件");
+  }
+  if (file.providers?.[id]) {
+    delete file.providers[id];
+    writeFileSync(modelsJsonPath(), `${JSON.stringify(file, null, 2)}\n`, "utf8");
+  }
+  try {
+    await removeApiKey(id);
+  } catch {
+    // key may not exist
+  }
+  await reloadRuntime();
 }
 
 export async function removeApiKey(providerId: string): Promise<void> {
