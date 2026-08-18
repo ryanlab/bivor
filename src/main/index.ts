@@ -1,6 +1,7 @@
-import { mkdirSync } from "node:fs";
-import { release } from "node:os";
-import { join } from "node:path";
+import { execFile } from "node:child_process";
+import { existsSync, mkdirSync, statSync } from "node:fs";
+import { homedir, release } from "node:os";
+import { dirname, join } from "node:path";
 import { app, BrowserWindow, dialog, ipcMain, shell } from "electron";
 import type { ChatCreateOptions, HostCommand, ScheduledTask } from "@shared/protocol";
 import { IPC } from "@shared/protocol";
@@ -117,6 +118,59 @@ function trafficLightPosition(): { x: number; y: number } {
   const major = Number(release().split(".")[0] ?? 0);
   const size = major >= 25 ? 14 : 16;
   return { x: 16, y: Math.round((TITLEBAR_HEIGHT - size) / 2) };
+}
+
+function expandUserPath(p: string): string {
+  if (p === "~") return homedir();
+  if (p.startsWith("~/") || p.startsWith("~\\")) return join(homedir(), p.slice(2));
+  return p;
+}
+
+/** Reveal a file, or open a directory, in the system file manager. */
+function revealInFileManager(rawPath: string): void {
+  const target = expandUserPath(String(rawPath ?? ""));
+  if (!target) return;
+
+  // Electron's shell.showItemInFolder("~/.…") is a no-op: it does not expand ~.
+  // `open` on macOS is also more reliable at bringing Finder to the front.
+  if (process.platform === "darwin") {
+    try {
+      if (existsSync(target) && statSync(target).isDirectory()) {
+        execFile("open", [target]);
+        return;
+      }
+      if (existsSync(target)) {
+        execFile("open", ["-R", target]);
+        return;
+      }
+      const parent = dirname(target);
+      if (existsSync(parent)) {
+        execFile("open", [parent]);
+        return;
+      }
+    } catch {
+      // fall through to Electron APIs
+    }
+  }
+
+  try {
+    if (existsSync(target) && statSync(target).isDirectory()) {
+      void shell.openPath(target);
+      return;
+    }
+    if (existsSync(target)) {
+      shell.showItemInFolder(target);
+      return;
+    }
+    const parent = dirname(target);
+    if (existsSync(parent)) {
+      void shell.openPath(parent);
+      return;
+    }
+  } catch {
+    // fall through
+  }
+  shell.showItemInFolder(target);
 }
 
 function createWindow(): BrowserWindow {
@@ -359,8 +413,8 @@ function registerIpc(): void {
     return dir;
   });
 
-  ipcMain.on(IPC.revealPath, (_e, path: string) => {
-    shell.showItemInFolder(path);
+  ipcMain.on(IPC.revealPath, (_e, rawPath: string) => {
+    revealInFileManager(rawPath);
   });
 
   // Dock/taskbar badge = number of approvals waiting across all chats.

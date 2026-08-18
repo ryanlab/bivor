@@ -117,8 +117,9 @@ export const zh = {
     vercelHint: "在 vercel.com/account/tokens 创建（权限选 Deployments）。保存后新建的会话生效。",
     teamId: "Team ID（可选）",
     teamHint: "个人账号可留空。Team 账号在 Team Settings → General 复制 Team ID。",
-    aboutStorage:
-      "会话数据存储在 ~/.pi/agent/sessions，凭证存储在 ~/.pi/agent/auth.json，与 pi CLI 完全互通。",
+    aboutSessionsPath: "会话数据存储路径",
+    aboutAuthPath: "凭证数据存储路径",
+    aboutInterop: "Bivor Desktop 与 PI CLI 完全互通",
     aboutPi: "关于 PI Coding Agent",
     aboutPiSite: "前往 pi.dev",
     aboutCurrentVersion: "当前版本",

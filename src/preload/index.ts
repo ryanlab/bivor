@@ -1,3 +1,5 @@
+import { homedir } from "node:os";
+import { join } from "node:path";
 import { contextBridge, ipcRenderer } from "electron";
 import type {
   AgentCrashPayload,
@@ -38,6 +40,12 @@ import type {
   UpdateCheckPayload,
 } from "@shared/protocol";
 import { IPC } from "@shared/protocol";
+
+function expandUserPath(p: string): string {
+  if (p === "~") return homedir();
+  if (p.startsWith("~/") || p.startsWith("~\\")) return join(homedir(), p.slice(2));
+  return p;
+}
 
 const api = {
   chat: {
@@ -338,7 +346,7 @@ const api = {
     dailyCwd: (): Promise<string> => ipcRenderer.invoke(IPC.dailyCwd),
     defaultProjectCwd: (): Promise<string> => ipcRenderer.invoke(IPC.defaultProjectCwd),
     revealPath: (path: string): void => {
-      ipcRenderer.send(IPC.revealPath, path);
+      ipcRenderer.send(IPC.revealPath, expandUserPath(path));
     },
     setBadge: (count: number): void => {
       ipcRenderer.send(IPC.setBadge, count);

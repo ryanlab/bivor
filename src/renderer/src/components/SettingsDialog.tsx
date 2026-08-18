@@ -3,6 +3,7 @@ import {
   Bot,
   Bug,
   Check,
+  FolderOpen,
   ExternalLink,
   Globe,
   Info,
@@ -313,7 +314,7 @@ function AuthTab(): React.JSX.Element {
     <div>
       <p className="pb-3 text-xs leading-relaxed text-fg-muted">
         {t("settings.authIntro", { path: "\0" }).split("\0")[0]}
-        <code className="rounded bg-bg-tertiary px-1">~/.pi/agent/auth.json</code>
+        <PathReveal path={PI_AUTH} />
         {t("settings.authIntro", { path: "\0" }).split("\0")[1]}
       </p>
       <div className="space-y-2">
@@ -598,6 +599,26 @@ function GithubIcon({ size = 14 }: { size?: number }): React.JSX.Element {
   );
 }
 
+const PI_SESSIONS = "~/.pi/agent/sessions";
+const PI_AUTH = "~/.pi/agent/auth.json";
+
+function PathReveal({ path }: { path: string }): React.JSX.Element {
+  const t = useT();
+  return (
+    <button
+      type="button"
+      title={t("files.reveal")}
+      onClick={(e) => {
+        e.stopPropagation();
+        window.pi.system.revealPath(path);
+      }}
+      className="cursor-pointer rounded bg-bg-tertiary px-1 font-mono text-[inherit] text-fg-secondary underline decoration-transparent underline-offset-2 transition-colors hover:bg-bg-hover hover:text-accent hover:decoration-accent"
+    >
+      {path}
+    </button>
+  );
+}
+
 function AboutLink({
   href,
   icon,
@@ -633,14 +654,34 @@ function AboutRow({
   label,
   hint,
   children,
+  onClick,
 }: {
   icon: React.ReactNode;
   label: string;
   hint?: string;
-  children: React.ReactNode;
+  children?: React.ReactNode;
+  onClick?: () => void;
 }): React.JSX.Element {
   return (
-    <div className="flex h-12 items-center gap-3 px-2.5">
+    <div
+      role={onClick ? "button" : undefined}
+      tabIndex={onClick ? 0 : undefined}
+      onClick={onClick}
+      onKeyDown={
+        onClick
+          ? (e) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                onClick();
+              }
+            }
+          : undefined
+      }
+      className={cn(
+        "flex h-12 items-center gap-3 px-2.5",
+        onClick && "cursor-pointer transition-colors hover:bg-bg-hover",
+      )}
+    >
       <span className="shrink-0 text-fg-muted">{icon}</span>
       <span className="text-[13px] text-fg">{label}</span>
       {hint && <span className="text-xs text-fg-muted">{hint}</span>}
@@ -777,9 +818,23 @@ function AboutPiTab(): React.JSX.Element {
           </button>
         </AboutRow>
         <AboutSep />
-        <div className="px-2.5 py-2.5 text-xs leading-relaxed">
-          <p className="text-fg-muted">{t("settings.aboutStorage")}</p>
-        </div>
+        <AboutRow
+          icon={<FolderOpen size={14} />}
+          label={t("settings.aboutSessionsPath")}
+          onClick={() => window.pi.system.revealPath(PI_SESSIONS)}
+        >
+          <PathReveal path={PI_SESSIONS} />
+        </AboutRow>
+        <AboutSep />
+        <AboutRow
+          icon={<KeyRound size={14} />}
+          label={t("settings.aboutAuthPath")}
+          onClick={() => window.pi.system.revealPath(PI_AUTH)}
+        >
+          <PathReveal path={PI_AUTH} />
+        </AboutRow>
+        <AboutSep />
+        <AboutRow icon={<Check size={14} />} label={t("settings.aboutInterop")} />
       </div>
     </div>
   );

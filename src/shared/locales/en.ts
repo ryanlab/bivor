@@ -120,8 +120,9 @@ export const en: Messages = {
       "Create a token at vercel.com/account/tokens (Deployments scope). Applies to new sessions after save.",
     teamId: "Team ID (optional)",
     teamHint: "Leave empty for a personal account. Copy the Team ID from Team Settings → General.",
-    aboutStorage:
-      "Sessions live in ~/.pi/agent/sessions and credentials in ~/.pi/agent/auth.json — fully compatible with the pi CLI.",
+    aboutSessionsPath: "Session data path",
+    aboutAuthPath: "Credentials path",
+    aboutInterop: "Bivor Desktop is fully compatible with the PI CLI",
     aboutPi: "About PI Coding Agent",
     aboutPiSite: "Visit pi.dev",
     aboutCurrentVersion: "Current version",
