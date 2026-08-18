@@ -1,7 +1,7 @@
 {
   "name": "bivor",
   "productName": "Bivor",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Bivor — a desktop workbench for the pi coding agent",
   "main": "out/main/index.js",
   "type": "module",
