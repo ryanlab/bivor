@@ -37,6 +37,7 @@ import type {
   VercelProjectDetail,
   VercelProjectInfo,
   VercelTestResult,
+  ApiKeyTestResult,
   SandboxStatusPayload,
   UpdateCheckPayload,
 } from "@shared/protocol";
@@ -85,6 +86,14 @@ const api = {
       title?: string;
       body?: string;
     }): Promise<{ ok: boolean; error?: string }> => ipcRenderer.invoke(IPC.barkTest, opts),
+  },
+  e2b: {
+    test: (opts?: { apiKey?: string }): Promise<ApiKeyTestResult> =>
+      ipcRenderer.invoke(IPC.e2bTest, opts),
+  },
+  tavily: {
+    test: (opts?: { apiKey?: string }): Promise<ApiKeyTestResult> =>
+      ipcRenderer.invoke(IPC.tavilyTest, opts),
   },
   resources: {
     listPackages: (cwd: string): Promise<PackageItem[]> =>

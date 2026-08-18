@@ -44,6 +44,7 @@ import { disposeAllFileWatchers, registerFileWatchIpc } from "./file-watch";
 import { registerEditorIpc } from "./editor-window";
 import { getConfig, setConfig } from "./config";
 import { sendBarkPush } from "./bark";
+import { testE2bApiKey, testTavilyApiKey } from "./key-tests";
 import {
   cancelVercelDeployment,
   deleteVercelDeployment,
@@ -270,6 +271,8 @@ function registerIpc(): void {
         deviceUrl: opts?.deviceUrl,
       }),
   );
+  ipcMain.handle(IPC.e2bTest, (_e, opts?: { apiKey?: string }) => testE2bApiKey(opts));
+  ipcMain.handle(IPC.tavilyTest, (_e, opts?: { apiKey?: string }) => testTavilyApiKey(opts));
   ipcMain.handle(IPC.packagesList, (_e, cwd: string) => listPackages(cwd));
   ipcMain.handle(IPC.packagesInstall, (e, cwd: string, source: string, local: boolean) =>
     installPackage(cwd, source, local, e.sender),

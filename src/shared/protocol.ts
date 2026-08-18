@@ -277,6 +277,11 @@ export type VercelTestResult =
   | { ok: true; username?: string; teamName?: string }
   | { ok: false; error: string };
 
+/** Settings probe for E2B / Tavily keys (same UX as Vercel / Bark). */
+export type ApiKeyTestResult =
+  | { ok: true; detail?: string }
+  | { ok: false; error: string };
+
 // ---------- 部署运维（Vercel） ----------
 
 export interface VercelProjectInfo {
@@ -834,6 +839,8 @@ export const IPC = {
   configGet: "config:get",
   configSet: "config:set",
   barkTest: "bark:test",
+  e2bTest: "e2b:test",
+  tavilyTest: "tavily:test",
   packagesList: "resources:packagesList",
   packagesInstall: "resources:packagesInstall",
   packagesRemove: "resources:packagesRemove",

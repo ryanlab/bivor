@@ -127,9 +127,9 @@ await ev(`(()=>{window.__store.getState().setHarnessOpen(${JSON.stringify(chatId
 // ---- 4. settings sandbox tab ----
 await ev(`(()=>{window.__store.getState().setSettingsOpen(true); return true})()`);
 await sleep(400);
-await ev(`(()=>{[...document.querySelectorAll("button")].find(b=>b.textContent.includes("沙箱 VM"))?.click(); return true})()`);
+await ev(`(()=>{[...document.querySelectorAll("button")].find(b=>b.textContent.includes("云端虚拟机（E2B）"))?.click(); return true})()`);
 await sleep(600);
-const hasKeyField = await ev(`!!document.querySelector('input[placeholder="e2b_..."]')`);
+const hasKeyField = await ev(`!!document.querySelector('input[placeholder="e2b_…"]')`);
 assert(hasKeyField, "settings sandbox tab renders key field");
 await shot("wave5-settings-sandbox");
 await ev(`(()=>{window.__store.getState().setSettingsOpen(false); return true})()`);

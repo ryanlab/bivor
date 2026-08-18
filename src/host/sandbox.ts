@@ -1,6 +1,6 @@
 /**
  * E2B cloud VM per chat: the agent gets vm_gui / vm_screenshot tools and the
- * user gets a live desktop stream. Requires E2B_API_KEY (set in 设置 → 沙箱).
+ * user gets a live desktop stream. Requires E2B_API_KEY (set in 设置 → 云端虚拟机（E2B）).
  */
 import { appendFileSync } from "node:fs";
 import { Type } from "@sinclair/typebox";

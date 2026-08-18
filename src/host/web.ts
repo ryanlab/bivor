@@ -1,6 +1,6 @@
 /**
  * 联网工具：web_search（Tavily API）+ web_fetch（抓页面转 markdown）。
- * web_fetch 无需任何 key；web_search 需要 TAVILY_API_KEY（设置 → 联网）。
+ * web_fetch 无需任何 key；web_search 需要 TAVILY_API_KEY（设置 → 联网（Tavily））。
  * 两者都无本机副作用，因此日常模式也开放。
  */
 import { Type } from "@sinclair/typebox";
@@ -39,7 +39,7 @@ function buildWebSearchTool(): ToolDefinition {
       if (!key) {
         return {
           content: [
-            { type: "text", text: "未配置搜索 API Key。请让用户在 设置 → 联网 里填入 Tavily API Key（tavily.com 有免费额度）。" },
+            { type: "text", text: "未配置搜索 API Key。请让用户在 设置 → 联网（Tavily） 里填入 Tavily API Key（tavily.com 有免费额度）。" },
           ],
           details: {},
           isError: true,

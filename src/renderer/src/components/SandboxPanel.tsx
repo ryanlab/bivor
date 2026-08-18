@@ -134,7 +134,7 @@ export function SandboxPanel({
             <p className="text-xs leading-relaxed text-fg-muted">{t("settings.sandboxIntro")}</p>
             <button
               type="button"
-              onClick={() => setSettingsOpen(true)}
+              onClick={() => setSettingsOpen(true, "sandbox")}
               className="rounded-xl bg-accent px-3.5 py-2 text-xs font-medium text-accent-fg hover:bg-accent-hover"
             >
               {t("sandbox.goSettings")}

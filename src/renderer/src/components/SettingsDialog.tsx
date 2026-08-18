@@ -416,9 +416,11 @@ function AppearanceTab(): React.JSX.Element {
 
 function SandboxTab(): React.JSX.Element {
   const t = useT();
+  const setSettingsOpen = useAppStore((s) => s.setSettingsOpen);
   const [key, setKey] = useState("");
   const [loaded, setLoaded] = useState(false);
-  const [saved, setSaved] = useState(false);
+  const [testing, setTesting] = useState(false);
+  const [testMsg, setTestMsg] = useState<{ ok: boolean; text: string } | null>(null);
 
   useEffect(() => {
     void window.pi.config.get().then((c) => {
@@ -432,51 +434,119 @@ function SandboxTab(): React.JSX.Element {
       <div>
         <div className="text-sm font-medium">{t("settings.sandboxTitle")}</div>
         <p className="pt-1 text-xs leading-relaxed text-fg-muted">{t("settings.sandboxIntro")}</p>
+        <div className="flex flex-wrap gap-x-3 gap-y-1 pt-1.5 text-[11px]">
+          <a
+            href="https://e2b.dev"
+            target="_blank"
+            rel="noreferrer"
+            className="inline-flex items-center gap-1 text-accent hover:underline"
+          >
+            {t("settings.e2bSite")}
+            <ExternalLink size={10} />
+          </a>
+        </div>
       </div>
       <div className="space-y-1.5">
         <label className="text-xs font-medium text-fg-secondary">E2B API Key</label>
-        <input
-          type="password"
-          value={key}
-          onChange={(e) => {
-            setKey(e.target.value);
-            setSaved(false);
-          }}
-          placeholder="e2b_..."
-          disabled={!loaded}
-          className="w-full rounded-lg border border-border bg-bg-input px-3 py-2 font-mono text-xs outline-none focus:border-accent/60"
-        />
-        <p className="text-[11px] text-fg-muted">{t("settings.e2bHint")}</p>
+        <div className="flex h-9 items-stretch gap-2">
+          <input
+            type="password"
+            value={key}
+            onChange={(e) => {
+              setKey(e.target.value);
+              setTestMsg(null);
+            }}
+            placeholder="e2b_…"
+            disabled={!loaded}
+            className="h-full min-w-0 flex-1 rounded-lg border border-border bg-bg-input px-3 font-mono text-xs outline-none focus:border-accent/60"
+          />
+          <button
+            type="button"
+            disabled={!loaded || testing || !key.trim()}
+            onClick={() => {
+              setTesting(true);
+              setTestMsg(null);
+              void window.pi.e2b
+                .test({ apiKey: key.trim() })
+                .then((r) => {
+                  if (r.ok) {
+                    setTestMsg({
+                      ok: true,
+                      text: r.detail
+                        ? t("settings.e2bVerified", { detail: r.detail })
+                        : t("common.success"),
+                    });
+                    return;
+                  }
+                  setTestMsg({
+                    ok: false,
+                    text:
+                      r.error === "missing"
+                        ? t("settings.e2bMissing")
+                        : (r.error ?? t("common.failed")),
+                  });
+                })
+                .finally(() => setTesting(false));
+            }}
+            className={cn(
+              "relative inline-flex h-full shrink-0 items-center justify-center rounded-lg border px-3 text-xs font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-40",
+              testMsg?.ok
+                ? "border-success/50 text-success"
+                : "border-fg-muted text-fg-secondary hover:border-fg-secondary hover:bg-bg-hover hover:text-fg",
+            )}
+          >
+            <span className="invisible whitespace-nowrap" aria-hidden>
+              {t("settings.e2bTesting")}
+            </span>
+            <span className="absolute inset-0 flex items-center justify-center">
+              {testing
+                ? t("settings.e2bTesting")
+                : testMsg?.ok
+                  ? t("common.success")
+                  : t("settings.e2bTest")}
+            </span>
+          </button>
+        </div>
+        <p className="text-[11px] text-fg-muted">
+          {t("settings.e2bHint", { url: "\0" }).split("\0")[0]}
+          <a
+            href="https://e2b.dev/dashboard?tab=keys"
+            target="_blank"
+            rel="noreferrer"
+            className="text-accent hover:underline"
+          >
+            e2b.dev/dashboard
+          </a>
+          {t("settings.e2bHint", { url: "\0" }).split("\0")[1]}
+        </p>
       </div>
       <div className="flex items-center gap-2">
         <button
           type="button"
           onClick={() => {
             void window.pi.config.set({ e2bApiKey: key.trim() || undefined }).then(() => {
-              setSaved(true);
-              setTimeout(() => setSaved(false), 2500);
+              setSettingsOpen(false);
             });
           }}
           className="rounded-lg bg-accent px-3 py-1.5 text-xs font-medium text-accent-fg hover:bg-accent-hover"
         >
           {t("common.save")}
         </button>
-        {saved && (
-          <span className="flex items-center gap-1 text-xs text-success">
-            <Check size={12} />
-            {t("common.saved")}
-          </span>
-        )}
       </div>
+      {testMsg && (
+        <p className={cn("text-xs", testMsg.ok ? "text-success" : "text-danger")}>{testMsg.text}</p>
+      )}
     </div>
   );
 }
 
 function WebTab(): React.JSX.Element {
   const t = useT();
+  const setSettingsOpen = useAppStore((s) => s.setSettingsOpen);
   const [key, setKey] = useState("");
   const [loaded, setLoaded] = useState(false);
-  const [saved, setSaved] = useState(false);
+  const [testing, setTesting] = useState(false);
+  const [testMsg, setTestMsg] = useState<{ ok: boolean; text: string } | null>(null);
 
   useEffect(() => {
     void window.pi.config.get().then((c) => {
@@ -490,42 +560,108 @@ function WebTab(): React.JSX.Element {
       <div>
         <div className="text-sm font-medium">{t("settings.webTitle")}</div>
         <p className="pt-1 text-xs leading-relaxed text-fg-muted">{t("settings.webIntro")}</p>
+        <div className="flex flex-wrap gap-x-3 gap-y-1 pt-1.5 text-[11px]">
+          <a
+            href="https://tavily.com"
+            target="_blank"
+            rel="noreferrer"
+            className="inline-flex items-center gap-1 text-accent hover:underline"
+          >
+            {t("settings.tavilySite")}
+            <ExternalLink size={10} />
+          </a>
+        </div>
       </div>
       <div className="space-y-1.5">
         <label className="text-xs font-medium text-fg-secondary">Tavily API Key</label>
-        <input
-          type="password"
-          value={key}
-          onChange={(e) => {
-            setKey(e.target.value);
-            setSaved(false);
-          }}
-          placeholder="tvly-..."
-          disabled={!loaded}
-          className="w-full rounded-lg border border-border bg-bg-input px-3 py-2 font-mono text-xs outline-none focus:border-accent/60"
-        />
-        <p className="text-[11px] text-fg-muted">{t("settings.tavilyHint")}</p>
+        <div className="flex h-9 items-stretch gap-2">
+          <input
+            type="password"
+            value={key}
+            onChange={(e) => {
+              setKey(e.target.value);
+              setTestMsg(null);
+            }}
+            placeholder="tvly-…"
+            disabled={!loaded}
+            className="h-full min-w-0 flex-1 rounded-lg border border-border bg-bg-input px-3 font-mono text-xs outline-none focus:border-accent/60"
+          />
+          <button
+            type="button"
+            disabled={!loaded || testing || !key.trim()}
+            onClick={() => {
+              setTesting(true);
+              setTestMsg(null);
+              void window.pi.tavily
+                .test({ apiKey: key.trim() })
+                .then((r) => {
+                  if (r.ok) {
+                    setTestMsg({
+                      ok: true,
+                      text: r.detail
+                        ? t("settings.tavilyVerified", { detail: r.detail })
+                        : t("common.success"),
+                    });
+                    return;
+                  }
+                  setTestMsg({
+                    ok: false,
+                    text:
+                      r.error === "missing"
+                        ? t("settings.tavilyMissing")
+                        : (r.error ?? t("common.failed")),
+                  });
+                })
+                .finally(() => setTesting(false));
+            }}
+            className={cn(
+              "relative inline-flex h-full shrink-0 items-center justify-center rounded-lg border px-3 text-xs font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-40",
+              testMsg?.ok
+                ? "border-success/50 text-success"
+                : "border-fg-muted text-fg-secondary hover:border-fg-secondary hover:bg-bg-hover hover:text-fg",
+            )}
+          >
+            <span className="invisible whitespace-nowrap" aria-hidden>
+              {t("settings.tavilyTesting")}
+            </span>
+            <span className="absolute inset-0 flex items-center justify-center">
+              {testing
+                ? t("settings.tavilyTesting")
+                : testMsg?.ok
+                  ? t("common.success")
+                  : t("settings.tavilyTest")}
+            </span>
+          </button>
+        </div>
+        <p className="text-[11px] text-fg-muted">
+          {t("settings.tavilyHint", { url: "\0" }).split("\0")[0]}
+          <a
+            href="https://app.tavily.com"
+            target="_blank"
+            rel="noreferrer"
+            className="text-accent hover:underline"
+          >
+            app.tavily.com
+          </a>
+          {t("settings.tavilyHint", { url: "\0" }).split("\0")[1]}
+        </p>
       </div>
       <div className="flex items-center gap-2">
         <button
           type="button"
           onClick={() => {
             void window.pi.config.set({ tavilyApiKey: key.trim() || undefined }).then(() => {
-              setSaved(true);
-              setTimeout(() => setSaved(false), 2500);
+              setSettingsOpen(false);
             });
           }}
           className="rounded-lg bg-accent px-3 py-1.5 text-xs font-medium text-accent-fg hover:bg-accent-hover"
         >
           {t("common.save")}
         </button>
-        {saved && (
-          <span className="flex items-center gap-1 text-xs text-success">
-            <Check size={12} />
-            {t("common.saved")}
-          </span>
-        )}
       </div>
+      {testMsg && (
+        <p className={cn("text-xs", testMsg.ok ? "text-success" : "text-danger")}>{testMsg.text}</p>
+      )}
     </div>
   );
 }
