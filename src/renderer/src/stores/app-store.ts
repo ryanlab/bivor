@@ -30,6 +30,7 @@ import { getRuntimePreset } from "@shared/runtime-presets";
 import type { AssistantMessage, PiMessage } from "@/lib/pi-messages";
 import { applyTheme, loadThemePreference, type ThemePreference } from "@/lib/theme";
 import { applyLocale, loadLocalePreference, type Locale } from "@/lib/locale";
+import { resetLayoutWidths } from "@/lib/use-drag-width";
 import { t as translate } from "@shared/locales";
 import { samePath } from "@/lib/format";
 import { type SessionTimeFilter } from "@/lib/session-time";
@@ -223,6 +224,7 @@ interface AppState {
   setTheme(pref: ThemePreference): void;
   setLocale(locale: Locale): void;
   toggleSidebar(): void;
+  resetLayout(): void;
   setSessionTimeFilter(filter: SessionTimeFilter): void;
   checkForUpdates(force?: boolean): Promise<void>;
   setAppMode(mode: ChatKind): void;
@@ -948,6 +950,11 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   toggleSidebar() {
     set((s) => ({ sidebarCollapsed: !s.sidebarCollapsed }));
+  },
+
+  resetLayout() {
+    resetLayoutWidths();
+    set({ sidebarCollapsed: false });
   },
 
   setSessionTimeFilter(filter) {

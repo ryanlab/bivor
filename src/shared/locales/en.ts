@@ -47,7 +47,6 @@ export const en: Messages = {
     label: "Language",
     zh: "中文",
     en: "English",
-    hint: "Applies immediately. New sessions will also reply in this language.",
   },
   time: {
     justNow: "Just now",
@@ -106,6 +105,9 @@ export const en: Messages = {
     themeSystem: "System",
     themeLight: "Light",
     themeDark: "Dark",
+    resetLayout: "Reset layout",
+    resetLayoutHint: "Restore sidebar, file tree, and preview widths to default",
+    resetLayoutAction: "Reset",
     sandboxTitle: "Cloud VM (E2B sandbox)",
     sandboxIntro:
       "Each task can get its own cloud Linux desktop VM. After switching the execution world to VM, the agent's bash and file I/O run in a fully isolated environment, and vm_gui can drive GUI apps. Watch the desktop live in the Cloud VM panel and take over anytime.",

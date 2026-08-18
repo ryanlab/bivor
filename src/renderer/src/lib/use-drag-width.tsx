@@ -1,5 +1,25 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { cn } from "@/lib/cn";
+
+const RESET_LAYOUT = "bivor:reset-layout";
+
+const LAYOUT_WIDTH_KEYS = [
+  "bivor:sidebar-width",
+  "bivor:preview-width",
+  "bivor:files-width",
+] as const;
+
+/** Clear persisted panel widths and notify open hooks to snap back to defaults. */
+export function resetLayoutWidths(): void {
+  for (const key of LAYOUT_WIDTH_KEYS) {
+    try {
+      localStorage.removeItem(key);
+    } catch {
+      // ignore
+    }
+  }
+  window.dispatchEvent(new Event(RESET_LAYOUT));
+}
 
 function readWidth(key: string, fallback: number, min: number, max: number): number {
   try {
@@ -22,6 +42,12 @@ export function useDragWidth(
   const [width, setWidth] = useState(() => readWidth(key, fallback, min, max));
   const widthRef = useRef(width);
   widthRef.current = width;
+
+  useEffect(() => {
+    const onReset = (): void => setWidth(fallback);
+    window.addEventListener(RESET_LAYOUT, onReset);
+    return () => window.removeEventListener(RESET_LAYOUT, onReset);
+  }, [fallback]);
 
   const onPointerDown = (e: React.PointerEvent): void => {
     e.preventDefault();

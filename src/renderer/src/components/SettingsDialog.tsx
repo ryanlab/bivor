@@ -15,6 +15,7 @@ import {
   Moon,
   Palette,
   Rocket,
+  RotateCcw,
   Scale,
   Smartphone,
   Sun,
@@ -339,6 +340,8 @@ function AppearanceTab(): React.JSX.Element {
   const setTheme = useAppStore((s) => s.setTheme);
   const locale = useAppStore((s) => s.locale);
   const setLocale = useAppStore((s) => s.setLocale);
+  const resetLayout = useAppStore((s) => s.resetLayout);
+  const setSettingsOpen = useAppStore((s) => s.setSettingsOpen);
   const themeOptions: { id: ThemePreference; label: string; icon: React.ReactNode }[] = [
     { id: "system", label: t("settings.themeSystem"), icon: <Monitor size={16} /> },
     { id: "light", label: t("settings.themeLight"), icon: <Sun size={16} /> },
@@ -387,7 +390,25 @@ function AppearanceTab(): React.JSX.Element {
             </button>
           ))}
         </div>
-        <p className="pt-2 text-[11px] leading-relaxed text-fg-muted">{t("locale.hint")}</p>
+      </div>
+      <div>
+        <div className="pb-2 text-xs font-medium text-fg-secondary">{t("settings.resetLayout")}</div>
+        <div className="flex items-center gap-3 rounded-xl border border-border px-3 py-3">
+          <p className="min-w-0 flex-1 text-[11px] leading-relaxed text-fg-muted">
+            {t("settings.resetLayoutHint")}
+          </p>
+          <button
+            type="button"
+            onClick={() => {
+              resetLayout();
+              setSettingsOpen(false);
+            }}
+            className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-xs text-fg-secondary transition-colors hover:border-border-strong hover:text-fg"
+          >
+            <RotateCcw size={12} />
+            {t("settings.resetLayoutAction")}
+          </button>
+        </div>
       </div>
     </div>
   );

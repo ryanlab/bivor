@@ -45,7 +45,6 @@ export const zh = {
     label: "界面语言",
     zh: "中文",
     en: "English",
-    hint: "切换后立即生效。新会话的 agent 也会用这种语言回复。",
   },
   time: {
     justNow: "刚刚",
@@ -104,6 +103,9 @@ export const zh = {
     themeSystem: "跟随系统",
     themeLight: "浅色",
     themeDark: "深色",
+    resetLayout: "重置布局",
+    resetLayoutHint: "侧栏、文件树、预览栏的拖动宽度恢复默认",
+    resetLayoutAction: "重置",
     sandboxTitle: "云端虚拟机（E2B 沙箱）",
     sandboxIntro:
       "配置后每个任务可以拥有独立的云端 Linux 桌面 VM：把执行世界切到 VM 后，agent 的 bash 与文件读写整体落在完全隔离的环境中，还可以用 vm_gui 运行和操作 GUI 程序；你可以在会话的「云端虚拟机」面板实时观看桌面并直接接管操作。",
