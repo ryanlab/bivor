@@ -2,8 +2,8 @@
  * Agent 运行状况面板：统一展示所有 pi agent 宿主进程（含定时任务的无头执行）
  * 的进程指标（PID / CPU / 内存及趋势 / 运行时长）与会话状态（运行中 / 空闲 /
  * 待审批 / 出错），并提供行内处置（停止本轮 / 关闭会话 / 强杀进程）。
- * 另有异常提示（长时间运行 / 疑似无响应 / 内存偏高）、定时任务概览（含行内
- * 立即运行 / 启停）与策略审批事件流。打开期间每 2 秒轮询一次主进程快照。
+ * 另有异常提示（长时间运行 / 疑似无响应 / 内存偏高）与策略审批事件流。
+ * 打开期间每 2 秒轮询一次主进程快照。
  */
 import { useEffect, useState } from "react";
 import {
@@ -17,17 +17,14 @@ import {
   GitFork,
   Loader2,
   MessageSquare,
-  Pause,
-  Play,
   ShieldAlert,
   Square,
-  Zap,
   Trash2,
   X,
 } from "lucide-react";
 import type { AgentMonitorSnapshot, AgentProcessInfo, PolicyEventPayload } from "@shared/protocol";
 import { useAppStore, type ChatState } from "@/stores/app-store";
-import { formatCost, formatDateTime, formatRelativeTime, formatTokens } from "@/lib/format";
+import { formatCost, formatRelativeTime, formatTokens } from "@/lib/format";
 import { isAssistantMessage, isUserMessage, userMessageText } from "@/lib/pi-messages";
 import type { AssistantMessage } from "@/lib/pi-messages";
 import { useT } from "@/lib/i18n";
@@ -158,6 +155,44 @@ function formatMemory(bytes?: number): string {
 /** 行内小图标按钮的公共样式；文字色与 hover 色由使用处补充 */
 const ICON_BTN = "rounded-md border border-border p-1 transition-colors";
 
+/** 会话运行环境：本机 / 云端 VM（含沙箱创建中与计费时长） */
+function EnvCell({ chat, t }: { chat?: ChatState; t: Translator }): React.JSX.Element {
+  const isVm = chat?.executionWorld === "vm" || chat?.sandbox?.status === "running";
+  const sandboxCreating = chat?.sandbox?.status === "creating";
+  if (!chat) {
+    return <td className="px-3 py-2 text-center text-fg-muted">{t("common.dash")}</td>;
+  }
+  if (!isVm && !sandboxCreating) {
+    return (
+      <td className="px-3 py-2 text-center">
+        <span className="inline-flex items-center whitespace-nowrap rounded-md bg-bg-hover px-1.5 py-0.5 text-[10.5px] text-fg-muted">
+          {t("monitor.envLocal")}
+        </span>
+      </td>
+    );
+  }
+  return (
+    <td className="px-3 py-2 text-center">
+      <span
+        title={
+          sandboxCreating
+            ? t("monitor.sandboxCreating")
+            : chat.sandbox?.status === "running"
+              ? t("monitor.sandboxRunning")
+              : t("monitor.envVm")
+        }
+        className="inline-flex items-center gap-1 whitespace-nowrap rounded-md bg-accent-muted px-1.5 py-0.5 text-[10.5px] text-accent"
+      >
+        {sandboxCreating ? <Loader2 size={9} className="animate-spin" /> : <Cloud size={9} />}
+        {t("monitor.envVm")}
+        {chat.sandbox?.status === "running" && chat.sandboxSince && (
+          <span className="font-mono">{formatDuration(Date.now() - chat.sandboxSince)}</span>
+        )}
+      </span>
+    </td>
+  );
+}
+
 /** 数值 + 趋势线的表格单元（CPU / 内存列） */
 function MetricCell({
   value,
@@ -240,12 +275,9 @@ export function AgentMonitorDialog(): React.JSX.Element | null {
   const open = useAppStore((s) => s.monitorOpen);
   const setOpen = useAppStore((s) => s.setMonitorOpen);
   const chats = useAppStore((s) => s.chats);
-  const scheduledTasks = useAppStore((s) => s.scheduledTasks);
   const setActiveChat = useAppStore((s) => s.setActiveChat);
   const closeChat = useAppStore((s) => s.closeChat);
   const abort = useAppStore((s) => s.abort);
-  const runTaskNow = useAppStore((s) => s.runScheduledTaskNow);
-  const saveTask = useAppStore((s) => s.saveScheduledTask);
   const [snapshot, setSnapshot] = useState<AgentMonitorSnapshot | null>(null);
   const [page, setPage] = useState(0);
   const [sort, setSort] = useState<{ key: SortKey; dir: "asc" | "desc" } | null>(null);
@@ -255,7 +287,6 @@ export function AgentMonitorDialog(): React.JSX.Element | null {
     setSnapshot(null);
     setPage(0);
     setSort(null);
-    void useAppStore.getState().refreshScheduledTasks();
     let cancelled = false;
     const refresh = (): void => {
       void window.pi.monitor
@@ -339,7 +370,6 @@ export function AgentMonitorDialog(): React.JSX.Element | null {
   const totalCpu =
     (snapshot?.self.cpuPercent ?? 0) + processes.reduce((n, p) => n + (p.cpuPercent ?? 0), 0);
 
-  const visibleTasks = scheduledTasks.filter((task) => task.enabled || task.running || task.lastRun);
   const policyFeed = Object.values(chats)
     .flatMap((chat) =>
       chat.policyEvents.map((event) => ({ event, title: chat.sessionName ?? undefined, chatId: chat.chatId })),
@@ -370,7 +400,7 @@ export function AgentMonitorDialog(): React.JSX.Element | null {
       onClick={() => setOpen(false)}
     >
       <div
-        className="dialog-in flex max-h-[85vh] w-[960px] flex-col overflow-hidden rounded-2xl border border-border-strong bg-bg-secondary shadow-2xl"
+        className="dialog-in flex max-h-[85vh] w-[1080px] flex-col overflow-hidden rounded-2xl border border-border-strong bg-bg-secondary shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex shrink-0 items-center gap-2 border-b border-border px-5 py-3.5">
@@ -418,7 +448,8 @@ export function AgentMonitorDialog(): React.JSX.Element | null {
                     <thead>
                       <tr className="border-b border-border text-left text-[10px] uppercase tracking-wider text-fg-muted/80">
                         <th className="px-3 py-1.5 font-semibold">{t("monitor.colSession")}</th>
-                        <th className="px-3 py-1.5 text-center font-semibold">{t("monitor.colStatus")}</th>
+                        <th className="w-24 px-3 py-1.5 text-center font-semibold">{t("monitor.colStatus")}</th>
+                        <th className="w-32 px-3 py-1.5 text-center font-semibold">{t("monitor.colEnv")}</th>
                         <th className="px-3 py-1.5 text-center font-semibold">{t("monitor.colActivity")}</th>
                         <th className="px-3 py-1.5 text-center font-semibold">PID</th>
                         {sortTh("cpu", "CPU")}
@@ -439,10 +470,11 @@ export function AgentMonitorDialog(): React.JSX.Element | null {
                           </div>
                         </td>
                         <td className="px-3 py-2 text-center">
-                          <span className="inline-flex items-center rounded-md bg-bg-hover px-1.5 py-0.5 text-[10.5px] text-fg-muted">
+                          <span className="inline-flex items-center whitespace-nowrap rounded-md bg-bg-hover px-1.5 py-0.5 text-[10.5px] text-fg-muted">
                             {t("monitor.statusSelf")}
                           </span>
                         </td>
+                        <td className="px-3 py-2 text-center text-fg-muted">{t("common.dash")}</td>
                         <td className="px-3 py-2 text-center text-fg-muted">{t("common.dash")}</td>
                         <td className="px-3 py-2 text-center font-mono text-[11px] text-fg-secondary">
                           {snapshot.self.pid}
@@ -471,9 +503,6 @@ export function AgentMonitorDialog(): React.JSX.Element | null {
                         ).length;
                         const ctxPct = chat?.contextUsage?.percent;
                         const clickable = Boolean(chat);
-                        const isVm =
-                          chat?.executionWorld === "vm" || chat?.sandbox?.status === "running";
-                        const sandboxCreating = chat?.sandbox?.status === "creating";
                         const longRunMin =
                           chat?.isStreaming && chat.streamingSince
                             ? Math.floor((Date.now() - chat.streamingSince) / 60_000)
@@ -524,7 +553,7 @@ export function AgentMonitorDialog(): React.JSX.Element | null {
                               <div className="flex flex-wrap items-center justify-center gap-1">
                                 <span
                                   className={cn(
-                                    "inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[10.5px]",
+                                    "inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-md px-1.5 py-0.5 text-[10.5px]",
                                     STATUS_STYLE[status],
                                   )}
                                 >
@@ -541,50 +570,27 @@ export function AgentMonitorDialog(): React.JSX.Element | null {
                                     title={t("monitor.alertStalledHint", {
                                       m: Math.floor(stalledMs / 60_000),
                                     })}
-                                    className="rounded-md bg-warning/15 px-1.5 py-0.5 text-[10.5px] text-warning"
+                                    className="whitespace-nowrap rounded-md bg-warning/15 px-1.5 py-0.5 text-[10.5px] text-warning"
                                   >
                                     {t("monitor.alertStalled")}
-                                  </span>
-                                )}
-                                {(isVm || sandboxCreating) && (
-                                  <span
-                                    title={
-                                      sandboxCreating
-                                        ? t("monitor.sandboxCreating")
-                                        : chat?.sandbox?.status === "running"
-                                          ? t("monitor.sandboxRunning")
-                                          : t("monitor.envVm")
-                                    }
-                                    className="inline-flex items-center gap-1 rounded-md bg-accent-muted px-1.5 py-0.5 text-[10.5px] text-accent"
-                                  >
-                                    {sandboxCreating ? (
-                                      <Loader2 size={9} className="animate-spin" />
-                                    ) : (
-                                      <Cloud size={9} />
-                                    )}
-                                    {t("monitor.envVm")}
-                                    {chat?.sandbox?.status === "running" && chat.sandboxSince && (
-                                      <span className="font-mono">
-                                        {formatDuration(Date.now() - chat.sandboxSince)}
-                                      </span>
-                                    )}
                                   </span>
                                 )}
                                 {longRunMin >= LONG_RUN_MS / 60_000 && (
                                   <span
                                     title={t("monitor.alertLongRun", { m: longRunMin })}
-                                    className="rounded-md bg-warning/15 px-1.5 py-0.5 text-[10.5px] text-warning"
+                                    className="whitespace-nowrap rounded-md bg-warning/15 px-1.5 py-0.5 text-[10.5px] text-warning"
                                   >
                                     {t("monitor.alertLongRunShort", { m: longRunMin })}
                                   </span>
                                 )}
                                 {highMem && (
-                                  <span className="rounded-md bg-warning/15 px-1.5 py-0.5 text-[10.5px] text-warning">
+                                  <span className="whitespace-nowrap rounded-md bg-warning/15 px-1.5 py-0.5 text-[10.5px] text-warning">
                                     {t("monitor.alertHighMem")}
                                   </span>
                                 )}
                               </div>
                             </td>
+                            <EnvCell chat={chat} t={t} />
                             <td className="truncate px-3 py-2 text-center text-fg-muted">
                               {activityOf(chat, t)}
                             </td>
@@ -715,83 +721,6 @@ export function AgentMonitorDialog(): React.JSX.Element | null {
                   >
                     <ChevronRight size={12} />
                   </button>
-                </div>
-              )}
-
-              {visibleTasks.length > 0 && (
-                <div>
-                  <SectionTitle>{t("monitor.scheduleTitle")}</SectionTitle>
-                  <div className="space-y-1.5">
-                    {visibleTasks.map((task) => (
-                      <div
-                        key={task.id}
-                        className="flex items-center gap-2.5 rounded-xl border border-border bg-bg px-3.5 py-2"
-                      >
-                        <AlarmClock size={12} className="shrink-0 text-fg-muted" />
-                        <span className="min-w-0 flex-1 truncate text-xs text-fg-secondary">
-                          {task.name}
-                        </span>
-                        {task.running ? (
-                          <span className="inline-flex shrink-0 items-center gap-1 rounded-md bg-accent-muted px-1.5 py-0.5 text-[10.5px] text-accent">
-                            <Loader2 size={9} className="animate-spin" />
-                            {t("monitor.scheduleRunning")}
-                          </span>
-                        ) : task.enabled && task.nextRunAt ? (
-                          <span className="shrink-0 text-[11px] text-fg-muted">
-                            {t("monitor.scheduleNext", {
-                              time: formatDateTime(task.nextRunAt, {
-                                month: "numeric",
-                                day: "numeric",
-                                hour: "2-digit",
-                                minute: "2-digit",
-                              }),
-                            })}
-                          </span>
-                        ) : (
-                          <span className="shrink-0 text-[11px] text-fg-muted">
-                            {t("monitor.schedulePaused")}
-                          </span>
-                        )}
-                        {task.lastRun && (
-                          <span
-                            title={task.lastRun.error}
-                            className={cn(
-                              "shrink-0 rounded-md px-1.5 py-0.5 text-[10.5px]",
-                              task.lastRun.status === "ok"
-                                ? "bg-bg-hover text-fg-muted"
-                                : "bg-danger/15 text-danger",
-                            )}
-                          >
-                            {task.lastRun.status === "ok"
-                              ? t("monitor.scheduleLastOk")
-                              : t("monitor.scheduleLastError")}
-                          </span>
-                        )}
-                        <div className="flex shrink-0 items-center gap-1">
-                          <button
-                            type="button"
-                            title={t("monitor.taskRunNow")}
-                            disabled={task.running}
-                            onClick={() => void runTaskNow(task.id)}
-                            className={cn(
-                              ICON_BTN,
-                              "text-fg-muted enabled:hover:text-accent disabled:opacity-40",
-                            )}
-                          >
-                            <Zap size={10} />
-                          </button>
-                          <button
-                            type="button"
-                            title={task.enabled ? t("monitor.taskPause") : t("monitor.taskResume")}
-                            onClick={() => void saveTask({ ...task, enabled: !task.enabled })}
-                            className={cn(ICON_BTN, "text-fg-muted hover:text-fg")}
-                          >
-                            {task.enabled ? <Pause size={10} /> : <Play size={10} />}
-                          </button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
                 </div>
               )}
 
