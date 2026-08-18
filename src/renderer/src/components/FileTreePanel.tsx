@@ -36,6 +36,7 @@ import { ipcErrorMessage } from "@/lib/format";
 import { GIT_COLOR, GIT_LABEL, refreshGitStatus, useGitStatus } from "@/lib/git-status";
 import { useDismiss } from "@/lib/use-dismiss";
 import { cn } from "@/lib/cn";
+import { ColSash, useDragWidth } from "@/lib/use-drag-width";
 import { useT } from "@/lib/i18n";
 
 interface TreeEntry {
@@ -120,58 +121,6 @@ const PREVIEW_W_KEY = "bivor:preview-width";
 const TREE_W_KEY = "bivor:files-width";
 const PREVIEW_W = { fallback: 480, min: 320, max: 960 };
 const TREE_W = { fallback: 272, min: 200, max: 480 };
-
-function readWidth(key: string, fallback: number, min: number, max: number): number {
-  try {
-    const n = Number(localStorage.getItem(key));
-    if (Number.isFinite(n)) return Math.min(max, Math.max(min, n));
-  } catch {
-    // ignore
-  }
-  return fallback;
-}
-
-/** 右侧栏：往左拖加宽。 */
-function useDragWidth(key: string, fallback: number, min: number, max: number) {
-  const [width, setWidth] = useState(() => readWidth(key, fallback, min, max));
-  const widthRef = useRef(width);
-  widthRef.current = width;
-
-  const onPointerDown = (e: React.PointerEvent): void => {
-    e.preventDefault();
-    const origin = e.clientX;
-    const start = widthRef.current;
-    const move = (ev: PointerEvent): void => {
-      setWidth(Math.round(Math.min(max, Math.max(min, start + origin - ev.clientX))));
-    };
-    const up = (): void => {
-      window.removeEventListener("pointermove", move);
-      window.removeEventListener("pointerup", up);
-      try {
-        localStorage.setItem(key, String(widthRef.current));
-      } catch {
-        // ignore
-      }
-    };
-    window.addEventListener("pointermove", move);
-    window.addEventListener("pointerup", up);
-  };
-
-  return [width, onPointerDown] as const;
-}
-
-function ColSash({ onDrag }: { onDrag: (e: React.PointerEvent) => void }): React.JSX.Element {
-  return (
-    <div
-      role="separator"
-      aria-orientation="vertical"
-      onPointerDown={onDrag}
-      className="relative z-10 w-px shrink-0 cursor-col-resize bg-border"
-    >
-      <div className="absolute inset-y-0 -left-1 w-2 hover:bg-bg-hover/50" />
-    </div>
-  );
-}
 
 function buildTree(entries: TreeEntry[]): FileNode[] {
   const root: FileNode[] = [];

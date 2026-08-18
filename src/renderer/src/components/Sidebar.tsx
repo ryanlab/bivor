@@ -22,6 +22,10 @@ import { Titlebar, WindowChrome } from "@/components/WindowChrome";
 import { formatRelativeTime } from "@/lib/format";
 import { cn } from "@/lib/cn";
 import { useT } from "@/lib/i18n";
+import { ColSash, useDragWidth } from "@/lib/use-drag-width";
+
+const SIDEBAR_W_KEY = "bivor:sidebar-width";
+const SIDEBAR_W = { fallback: 272, min: 200, max: 480 };
 
 function SessionRow({
   session,
@@ -167,6 +171,13 @@ export function Sidebar(): React.JSX.Element {
   const sessionCwd = isDaily ? dailyCwd : activeProjectPath;
   const visibleChatIds = chatOrder.filter((id) => chats[id]?.kind === appMode);
   const canWorktree = !isDaily && activeProjectIsGit;
+  const [width, onDrag] = useDragWidth(
+    SIDEBAR_W_KEY,
+    SIDEBAR_W.fallback,
+    SIDEBAR_W.min,
+    SIDEBAR_W.max,
+    "right",
+  );
 
   useEffect(() => {
     void refreshSessions();
@@ -179,7 +190,8 @@ export function Sidebar(): React.JSX.Element {
   );
 
   return (
-    <aside className="flex w-[272px] shrink-0 flex-col bg-bg-secondary">
+    <div className="flex h-full min-h-0 shrink-0">
+      <aside className="flex min-h-0 shrink-0 flex-col bg-bg-secondary" style={{ width }}>
       <Titlebar>
         <WindowChrome trafficLights />
       </Titlebar>
@@ -381,6 +393,8 @@ export function Sidebar(): React.JSX.Element {
           {t("common.settings")}
         </button>
       </div>
-    </aside>
+      </aside>
+      <ColSash onDrag={onDrag} />
+    </div>
   );
 }
