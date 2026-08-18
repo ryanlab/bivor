@@ -11,7 +11,12 @@ import type {
   AgentMonitorSnapshot,
   AgentProcessInfo,
   AppSelfInfo,
+  AppVersions,
 } from "@shared/protocol";
+
+export function getAppVersions(): AppVersions {
+  return { appVersion: app.getVersion(), piVersion: PI_VERSION };
+}
 
 interface TrackedAgent {
   chatId: string;
@@ -140,8 +145,7 @@ export function getMonitorSnapshot(): AgentMonitorSnapshot {
     [...live.values()].map((t) => t.proc.pid).filter((pid): pid is number => pid !== undefined),
   );
   return {
-    piVersion: PI_VERSION,
-    appVersion: app.getVersion(),
+    ...getAppVersions(),
     self: collectSelf(all, agentPids),
     processes,
   };

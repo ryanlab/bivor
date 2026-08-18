@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import {
   Activity,
   AlarmClock,
+  ArrowUpCircle,
   BarChart3,
   Check,
   GitBranch,
@@ -11,18 +12,20 @@ import {
   Package,
   Pencil,
   Plus,
+  RefreshCw,
   Rocket,
   Settings,
   Trash2,
   X,
 } from "lucide-react";
-import type { SessionListItem } from "@shared/protocol";
+import type { AppVersions, SessionListItem } from "@shared/protocol";
 import { useAppStore } from "@/stores/app-store";
 import { Titlebar, WindowChrome } from "@/components/WindowChrome";
 import { formatRelativeTime } from "@/lib/format";
 import { cn } from "@/lib/cn";
 import { useT } from "@/lib/i18n";
 import { ColSash, useDragWidth } from "@/lib/use-drag-width";
+import { filterSessionsByTime } from "@/lib/session-time";
 
 const SIDEBAR_W_KEY = "bivor:sidebar-width";
 const SIDEBAR_W = { fallback: 272, min: 200, max: 480 };
@@ -154,7 +157,20 @@ export function Sidebar(): React.JSX.Element {
   const activeProjectIsGit = useAppStore((s) => s.activeProjectIsGit);
   const openWorktreeChat = useAppStore((s) => s.openWorktreeChat);
   const [worktreeBusy, setWorktreeBusy] = useState(false);
+  const [versions, setVersions] = useState<AppVersions>();
+  const updateInfo = useAppStore((s) => s.updateInfo);
+  const updateChecking = useAppStore((s) => s.updateChecking);
+  const checkForUpdates = useAppStore((s) => s.checkForUpdates);
+  const [checkedNoUpdate, setCheckedNoUpdate] = useState(false);
+
+  const manualCheck = async (): Promise<void> => {
+    setCheckedNoUpdate(false);
+    await checkForUpdates(true);
+    setCheckedNoUpdate(true);
+    setTimeout(() => setCheckedNoUpdate(false), 4000);
+  };
   const sessions = useAppStore((s) => s.sessions);
+  const sessionTimeFilter = useAppStore((s) => s.sessionTimeFilter);
   const sessionsLoading = useAppStore((s) => s.sessionsLoading);
   const chats = useAppStore((s) => s.chats);
   const chatOrder = useAppStore((s) => s.chatOrder);
@@ -183,6 +199,12 @@ export function Sidebar(): React.JSX.Element {
     void refreshSessions();
   }, [activeProjectPath, dailyCwd, appMode, refreshSessions]);
 
+  useEffect(() => {
+    void window.pi.system.versions().then(setVersions);
+  }, []);
+
+  const visibleSessions = filterSessionsByTime(sessions, sessionTimeFilter);
+
   const openSessionFiles = new Map(
     Object.values(chats)
       .filter((c) => c.sessionFile)
@@ -197,6 +219,38 @@ export function Sidebar(): React.JSX.Element {
       </Titlebar>
 
       <div className="px-2 pt-1">
+        {versions && (
+          <div className="flex items-center gap-1.5 px-2.5 pb-1.5 pt-0.5">
+            <span className="font-serif-display text-[13px] font-semibold text-fg">
+              {t("sidebar.versions", { app: versions.appVersion })}
+            </span>
+            <button
+              type="button"
+              title={t("updates.checkTitle")}
+              disabled={updateChecking}
+              onClick={() => void manualCheck()}
+              className="rounded p-0.5 text-fg-muted transition-colors hover:bg-bg-hover hover:text-fg disabled:opacity-60"
+            >
+              <RefreshCw size={11} strokeWidth={2} className={cn(updateChecking && "animate-spin")} />
+            </button>
+            {!updateChecking && updateInfo?.hasUpdate && (
+              <button
+                type="button"
+                title={t("updates.availableTitle", { latest: updateInfo.latest! })}
+                onClick={() => window.open(updateInfo.url)}
+                className="flex items-center gap-1 rounded-full bg-accent-muted px-1.5 py-0.5 text-[10.5px] text-accent transition-colors hover:bg-accent hover:text-white"
+              >
+                <ArrowUpCircle size={11} strokeWidth={2} />
+                {updateInfo.latest}
+              </button>
+            )}
+            {!updateChecking && checkedNoUpdate && !updateInfo?.hasUpdate && (
+              <span className="text-[10.5px] text-fg-muted">
+                {updateInfo?.error ? t("updates.checkFailed") : t("updates.upToDate")}
+              </span>
+            )}
+          </div>
+        )}
         <button
           type="button"
           onClick={showWelcome}
@@ -327,16 +381,18 @@ export function Sidebar(): React.JSX.Element {
           )}
         </div>
         <div className="min-h-0 flex-1 overflow-y-auto px-2 pb-2">
-          {sessions.length === 0 && !sessionsLoading && (
+          {visibleSessions.length === 0 && !sessionsLoading && (
             <div className="px-2 py-3 text-xs text-fg-muted">
-              {isDaily
-                ? t("sidebar.noChats")
-                : activeProjectPath
-                  ? t("sidebar.noSessions")
-                  : t("sidebar.pickProject")}
+              {sessions.length > 0
+                ? t("sidebar.noInRange")
+                : isDaily
+                  ? t("sidebar.noChats")
+                  : activeProjectPath
+                    ? t("sidebar.noSessions")
+                    : t("sidebar.pickProject")}
             </div>
           )}
-          {sessions.map((session) => (
+          {visibleSessions.map((session) => (
             <SessionRow
               key={session.path}
               session={session}

@@ -3,6 +3,7 @@ import type {
   AgentCrashPayload,
   AgentMonitorSnapshot,
   AppConfigPayload,
+  AppVersions,
   AuthFlowEvent,
   ChatCreateOptions,
   ChatCreateResult,
@@ -34,6 +35,7 @@ import type {
   VercelProjectDetail,
   VercelProjectInfo,
   SandboxStatusPayload,
+  UpdateCheckPayload,
 } from "@shared/protocol";
 import { IPC } from "@shared/protocol";
 
@@ -347,6 +349,11 @@ const api = {
       return () => ipcRenderer.removeListener("menu:action", handler);
     },
     platform: process.platform,
+    versions: (): Promise<AppVersions> => ipcRenderer.invoke(IPC.systemVersions),
+  },
+  updates: {
+    check: (force?: boolean): Promise<UpdateCheckPayload> =>
+      ipcRenderer.invoke(IPC.updatesCheck, force),
   },
 };
 

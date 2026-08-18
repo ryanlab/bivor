@@ -1,8 +1,15 @@
+import { useRef, useState } from "react";
+import { Check } from "lucide-react";
 import { TITLEBAR_HEIGHT } from "@shared/titlebar";
 import { getRuntimePreset } from "@shared/runtime-presets";
 import { useAppStore, WORKSPACE_TERM_ID } from "@/stores/app-store";
 import { cn } from "@/lib/cn";
+import { useDismiss } from "@/lib/use-dismiss";
 import { useT } from "@/lib/i18n";
+import {
+  SESSION_TIME_FILTERS,
+  TIME_FILTER_LABEL,
+} from "@/lib/session-time";
 import { FilesGlyph, Glyph, SandboxGlyph, TerminalGlyph } from "./glyphs";
 
 const MOD = navigator.platform.startsWith("Mac") ? "⌘" : "Ctrl";
@@ -60,19 +67,84 @@ function SearchGlyph(): React.JSX.Element {
   );
 }
 
+function FilterGlyph(): React.JSX.Element {
+  return (
+    <Glyph>
+      <path d="M2.6 3.2h10.8L9.4 8.4v3.6L6.6 13.6V8.4L2.6 3.2Z" strokeLinejoin="round" />
+    </Glyph>
+  );
+}
+
 function ChromeButton({
   title,
   onClick,
+  active,
   children,
 }: {
   title: string;
   onClick: () => void;
+  active?: boolean;
   children: React.ReactNode;
 }): React.JSX.Element {
   return (
-    <button type="button" title={title} onClick={onClick} className={chromeBtn}>
+    <button
+      type="button"
+      title={title}
+      onClick={onClick}
+      className={cn(chromeBtn, active && "bg-bg-hover text-fg")}
+    >
       {children}
     </button>
+  );
+}
+
+function TimeFilterButton(): React.JSX.Element {
+  const t = useT();
+  const filter = useAppStore((s) => s.sessionTimeFilter);
+  const setFilter = useAppStore((s) => s.setSessionTimeFilter);
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  useDismiss(open, ref, () => setOpen(false));
+  const filtered = filter !== "all";
+
+  return (
+    <div ref={ref} className="no-drag relative">
+      <ChromeButton
+        title={filtered ? t(TIME_FILTER_LABEL[filter]) : t("window.filterTime")}
+        active={open || filtered}
+        onClick={() => setOpen((v) => !v)}
+      >
+        <FilterGlyph />
+        {filtered && (
+          <span className="absolute right-1 top-1 h-1.5 w-1.5 rounded-full bg-accent" />
+        )}
+      </ChromeButton>
+      {open && (
+        <div className="dialog-in absolute left-0 top-full z-50 mt-1 w-44 rounded-xl border border-border-strong bg-bg p-1 shadow-xl">
+          <div className="px-2.5 pb-1 pt-1.5 text-[11px] text-fg-muted">{t("window.filterTime")}</div>
+          {SESSION_TIME_FILTERS.map((id) => {
+            const selected = id === filter;
+            return (
+              <button
+                key={id}
+                type="button"
+                onClick={() => {
+                  setFilter(id);
+                  setOpen(false);
+                }}
+                className={cn(
+                  "flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-[13px] transition-colors",
+                  selected ? "bg-bg-hover text-fg" : "text-fg-secondary hover:bg-bg-hover hover:text-fg",
+                )}
+              >
+                <span className="min-w-0 flex-1">{t(TIME_FILTER_LABEL[id])}</span>
+                {selected && <Check size={14} strokeWidth={2.2} className="shrink-0 text-success" />}
+              </button>
+            );
+          })}
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -122,6 +194,7 @@ export function WindowChrome({
       <ChromeButton title={t("window.search", { mod: MOD })} onClick={() => setPaletteOpen(true)}>
         <SearchGlyph />
       </ChromeButton>
+      <TimeFilterButton />
     </div>
   );
 }

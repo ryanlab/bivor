@@ -409,11 +409,31 @@ export interface AppSelfInfo {
   memoryHistory: number[];
 }
 
-export interface AgentMonitorSnapshot {
-  /** 内嵌 pi SDK（@earendil-works/pi-coding-agent）的版本 */
-  piVersion: string;
+export interface AppVersions {
   /** Bivor 应用版本 */
   appVersion: string;
+  /** 内嵌 pi SDK（@earendil-works/pi-coding-agent）的版本 */
+  piVersion: string;
+}
+
+/** 新版本检测结果（数据来自 GitHub Releases） */
+export interface UpdateCheckPayload {
+  /** 当前运行版本 */
+  current: string;
+  /** 最新 release 版本（检查失败时缺省） */
+  latest?: string;
+  /** 是否有更新可用 */
+  hasUpdate: boolean;
+  /** 最新 release 页面（下载入口） */
+  url: string;
+  /** release notes（截断） */
+  notes?: string;
+  checkedAt: number;
+  /** 网络错误等失败原因 */
+  error?: string;
+}
+
+export interface AgentMonitorSnapshot extends AppVersions {
   self: AppSelfInfo;
   processes: AgentProcessInfo[];
 }
@@ -759,6 +779,8 @@ export const IPC = {
   createFolder: "dialog:createFolder",
   dailyCwd: "system:dailyCwd",
   defaultProjectCwd: "system:defaultProjectCwd",
+  systemVersions: "system:versions",
+  updatesCheck: "updates:check",
   configGet: "config:get",
   configSet: "config:set",
   packagesList: "resources:packagesList",

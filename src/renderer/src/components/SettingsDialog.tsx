@@ -1,5 +1,7 @@
 import { useEffect, useState } from "react";
 import {
+  Bot,
+  Bug,
   Check,
   ExternalLink,
   Globe,
@@ -12,6 +14,7 @@ import {
   Moon,
   Palette,
   Rocket,
+  Scale,
   Sun,
   Trash2,
   X,
@@ -584,33 +587,207 @@ function DeployTab(): React.JSX.Element {
   );
 }
 
+const REPO_URL = "https://github.com/ryanlab/bivor";
+
+/** lucide 已移除品牌图标，这里内联 GitHub 标志 */
+function GithubIcon({ size = 14 }: { size?: number }): React.JSX.Element {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor" aria-hidden>
+      <path d="M12 .5C5.65.5.5 5.65.5 12c0 5.08 3.29 9.39 7.86 10.91.58.11.79-.25.79-.55v-2.17c-3.2.7-3.87-1.36-3.87-1.36-.52-1.33-1.28-1.68-1.28-1.68-1.04-.71.08-.7.08-.7 1.15.08 1.76 1.18 1.76 1.18 1.03 1.76 2.69 1.25 3.35.96.1-.75.4-1.25.72-1.54-2.55-.29-5.24-1.28-5.24-5.68 0-1.26.45-2.28 1.18-3.09-.12-.29-.51-1.46.11-3.05 0 0 .97-.31 3.17 1.18a11.1 11.1 0 0 1 5.78 0c2.2-1.49 3.16-1.18 3.16-1.18.63 1.59.24 2.76.12 3.05.74.81 1.18 1.83 1.18 3.09 0 4.41-2.69 5.38-5.26 5.66.41.36.78 1.05.78 2.13v3.16c0 .3.2.67.8.55A11.51 11.51 0 0 0 23.5 12C23.5 5.65 18.35.5 12 .5Z" />
+    </svg>
+  );
+}
+
+function AboutLink({
+  href,
+  icon,
+  label,
+  hint,
+}: {
+  href: string;
+  icon: React.ReactNode;
+  label: string;
+  hint?: string;
+}): React.JSX.Element {
+  return (
+    <a
+      href={href}
+      target="_blank"
+      rel="noreferrer"
+      className="flex h-12 items-center gap-3 px-2.5 transition-colors hover:bg-bg-hover"
+    >
+      <span className="shrink-0 text-fg-muted">{icon}</span>
+      <span className="text-[13px] text-fg">{label}</span>
+      {hint && <span className="text-xs text-fg-muted">{hint}</span>}
+      <div className="min-w-0 flex-1" />
+      <ExternalLink size={12} className="shrink-0 text-fg-muted" />
+    </a>
+  );
+}
+
+const aboutBtn =
+  "inline-flex h-8 shrink-0 items-center rounded-lg border border-border px-3.5 text-xs text-fg-secondary transition-colors hover:bg-bg-hover hover:text-fg disabled:opacity-60";
+
+function AboutRow({
+  icon,
+  label,
+  hint,
+  children,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  hint?: string;
+  children: React.ReactNode;
+}): React.JSX.Element {
+  return (
+    <div className="flex h-12 items-center gap-3 px-2.5">
+      <span className="shrink-0 text-fg-muted">{icon}</span>
+      <span className="text-[13px] text-fg">{label}</span>
+      {hint && <span className="text-xs text-fg-muted">{hint}</span>}
+      <div className="min-w-0 flex-1" />
+      {children}
+    </div>
+  );
+}
+
+function AboutSep(): React.JSX.Element {
+  return <div className="mx-2.5 h-px bg-border" />;
+}
+
 function AboutTab(): React.JSX.Element {
   const t = useT();
+  const [versions, setVersions] = useState<{ appVersion: string; piVersion: string }>();
+  const updateInfo = useAppStore((s) => s.updateInfo);
+  const updateChecking = useAppStore((s) => s.updateChecking);
+  const checkForUpdates = useAppStore((s) => s.checkForUpdates);
+  const [checkedOnce, setCheckedOnce] = useState(false);
+
+  useEffect(() => {
+    void window.pi.system.versions().then(setVersions);
+  }, []);
+
+  const manualCheck = async (): Promise<void> => {
+    await checkForUpdates(true);
+    setCheckedOnce(true);
+  };
+
   return (
     <div className="space-y-3 text-[13px] leading-relaxed text-fg-secondary">
-      <div>
-        <div className="font-serif-display text-lg text-fg">{t("app.name")}</div>
-        <div className="text-xs text-fg-muted">{t("settings.aboutVersion")}</div>
+      <div className="flex items-baseline gap-2">
+        <span className="font-serif-display text-lg text-fg">{t("app.name")}</span>
+        {versions && <span className="text-xs text-fg-muted">v{versions.appVersion}</span>}
       </div>
-      <p className="text-xs">
-        {t("settings.aboutBody")}{" "}
-        <a
-          href="https://pi.dev"
-          target="_blank"
-          rel="noreferrer"
-          className="inline-flex items-center gap-0.5 text-accent hover:underline"
+      <div className="rounded-xl border border-border">
+        <AboutRow
+          icon={<Info size={14} />}
+          label={t("settings.aboutCurrentVersion")}
+          hint={versions ? `v${versions.appVersion}` : undefined}
         >
-          pi.dev <ExternalLink size={10} />
-        </a>
-      </p>
-      <p className="text-xs text-fg-muted">{t("settings.aboutStorage")}</p>
+          {checkedOnce && !updateChecking && updateInfo && !updateInfo.hasUpdate && (
+            <span className="text-xs text-fg-muted">
+              {updateInfo.error ? t("updates.checkFailed") : t("updates.upToDate")}
+            </span>
+          )}
+          {updateInfo?.hasUpdate ? (
+            <button
+              type="button"
+              title={t("updates.availableTitle", { latest: updateInfo.latest! })}
+              onClick={() => window.open(updateInfo.url)}
+              className="inline-flex h-8 shrink-0 items-center rounded-lg bg-accent px-3.5 text-xs text-white transition-opacity hover:opacity-90"
+            >
+              {t("settings.aboutDownload", { v: updateInfo.latest! })}
+            </button>
+          ) : (
+            <button
+              type="button"
+              disabled={updateChecking}
+              onClick={() => void manualCheck()}
+              className={aboutBtn}
+            >
+              {updateChecking ? t("updates.checking") : t("settings.aboutCheck")}
+            </button>
+          )}
+        </AboutRow>
+        <AboutSep />
+        <AboutLink
+          href={REPO_URL}
+          icon={<Globe size={14} />}
+          label={t("settings.aboutWebsite")}
+        />
+        <AboutSep />
+        <AboutLink
+          href={REPO_URL}
+          icon={<GithubIcon />}
+          label={t("settings.aboutGithub")}
+          hint="ryanlab/bivor"
+        />
+        <AboutSep />
+        <AboutLink
+          href={`${REPO_URL}/releases/latest`}
+          icon={<Rocket size={14} />}
+          label={t("settings.aboutReleases")}
+        />
+        <AboutSep />
+        <AboutLink
+          href={`${REPO_URL}/issues`}
+          icon={<Bug size={14} />}
+          label={t("settings.aboutIssues")}
+        />
+        <AboutSep />
+        <AboutLink
+          href={`${REPO_URL}/blob/main/LICENSE`}
+          icon={<Scale size={14} />}
+          label={t("settings.aboutLicense")}
+          hint="MIT"
+        />
+      </div>
+
+      <p className="text-[11px] text-fg-muted">{t("settings.aboutCopyright")}</p>
+    </div>
+  );
+}
+
+function AboutPiTab(): React.JSX.Element {
+  const t = useT();
+  const [versions, setVersions] = useState<{ appVersion: string; piVersion: string }>();
+
+  useEffect(() => {
+    void window.pi.system.versions().then(setVersions);
+  }, []);
+
+  return (
+    <div className="space-y-3 text-[13px] leading-relaxed text-fg-secondary">
+      <div className="flex items-baseline gap-2">
+        <span className="font-serif-display text-lg text-fg">PI Coding Agent</span>
+        {versions && <span className="text-xs text-fg-muted">v{versions.piVersion}</span>}
+      </div>
+
+      <div className="rounded-xl border border-border">
+        <AboutRow
+          icon={<Bot size={14} />}
+          label={t("settings.aboutPi")}
+          hint={versions ? `v${versions.piVersion}` : undefined}
+        >
+          <button
+            type="button"
+            onClick={() => window.open("https://pi.dev")}
+            className={aboutBtn}
+          >
+            {t("settings.aboutPiSite")}
+          </button>
+        </AboutRow>
+        <AboutSep />
+        <div className="px-2.5 py-2.5 text-xs leading-relaxed">
+          <p className="text-fg-muted">{t("settings.aboutStorage")}</p>
+        </div>
+      </div>
     </div>
   );
 }
 
 // ---------- Dialog ----------
 
-const TAB_IDS = ["auth", "sandbox", "web", "deploy", "appearance", "about"] as const;
+const TAB_IDS = ["auth", "sandbox", "web", "deploy", "appearance", "about", "pi"] as const;
 type TabId = (typeof TAB_IDS)[number];
 
 export function SettingsDialog(): React.JSX.Element | null {
@@ -631,6 +808,7 @@ export function SettingsDialog(): React.JSX.Element | null {
     { id: "web", label: t("settings.tabs.web"), icon: <Globe size={14} /> },
     { id: "deploy", label: t("settings.tabs.deploy"), icon: <Rocket size={14} /> },
     { id: "appearance", label: t("settings.tabs.appearance"), icon: <Palette size={14} /> },
+    { id: "pi", label: t("settings.tabs.pi"), icon: <Bot size={14} /> },
     { id: "about", label: t("settings.tabs.about"), icon: <Info size={14} /> },
   ];
 
@@ -684,6 +862,7 @@ export function SettingsDialog(): React.JSX.Element | null {
             {tab === "deploy" && <DeployTab />}
             {tab === "appearance" && <AppearanceTab />}
             {tab === "about" && <AboutTab />}
+            {tab === "pi" && <AboutPiTab />}
           </div>
         </div>
       </div>

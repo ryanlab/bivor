@@ -6,7 +6,8 @@ import type { ChatCreateOptions, HostCommand, ScheduledTask } from "@shared/prot
 import { IPC } from "@shared/protocol";
 import { TITLEBAR_HEIGHT } from "@shared/titlebar";
 import { createChat, disposeAllChats, disposeChat, sendChatCommand } from "./chats";
-import { getMonitorSnapshot, killAgentProcess } from "./agent-monitor";
+import { getAppVersions, getMonitorSnapshot, killAgentProcess } from "./agent-monitor";
+import { checkForUpdates } from "./updates";
 import {
   createTerminal,
   disposeAllTerminals,
@@ -368,6 +369,8 @@ function registerIpc(): void {
   });
 
   // agent 运行状况监控
+  ipcMain.handle(IPC.systemVersions, () => getAppVersions());
+  ipcMain.handle(IPC.updatesCheck, (_e, force?: boolean) => checkForUpdates(force));
   ipcMain.handle(IPC.monitorSnapshot, () => getMonitorSnapshot());
   ipcMain.handle(IPC.monitorKill, (_e, chatId: string) => killAgentProcess(chatId));
 

@@ -25,6 +25,7 @@ import { useAppStore } from "@/stores/app-store";
 import { formatRelativeTime, projectName } from "@/lib/format";
 import { cn } from "@/lib/cn";
 import { useT } from "@/lib/i18n";
+import { filterSessionsByTime } from "@/lib/session-time";
 
 interface Item {
   id: string;
@@ -50,6 +51,7 @@ export function CommandPalette(): React.JSX.Element | null {
   const chatOrder = useAppStore((s) => s.chatOrder);
   const chats = useAppStore((s) => s.chats);
   const sessionList = useAppStore((s) => s.sessions);
+  const sessionTimeFilter = useAppStore((s) => s.sessionTimeFilter);
   const appMode = useAppStore((s) => s.appMode);
   const locale = useAppStore((s) => s.locale);
   const activeProjectPath = useAppStore((s) => s.activeProjectPath);
@@ -271,7 +273,9 @@ export function CommandPalette(): React.JSX.Element | null {
           },
         };
       });
-    const sessions: Item[] = s.sessions.slice(0, 30).map((sess) => {
+    const sessions: Item[] = filterSessionsByTime(s.sessions, s.sessionTimeFilter)
+      .slice(0, 30)
+      .map((sess) => {
       const label = sess.name || sess.firstUserMessage || t("sidebar.emptyChat");
       return {
         id: `session-${sess.path}`,
@@ -290,7 +294,18 @@ export function CommandPalette(): React.JSX.Element | null {
       };
     });
     return [...actions, ...openChats, ...sessions];
-  }, [open, activeProjectIsGit, activeChatId, chatOrder, chats, sessionList, appMode, locale, t]);
+  }, [
+    open,
+    activeProjectIsGit,
+    activeChatId,
+    chatOrder,
+    chats,
+    sessionList,
+    sessionTimeFilter,
+    appMode,
+    locale,
+    t,
+  ]);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();

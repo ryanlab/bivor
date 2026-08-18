@@ -37,6 +37,11 @@ export default function App(): React.JSX.Element {
   useEffect(() => {
     const unsubscribe = window.pi.chat.onEvent(handleEnvelope);
     void loadCatalog();
+    void useAppStore.getState().checkForUpdates();
+    const updateTimer = setInterval(
+      () => void useAppStore.getState().checkForUpdates(),
+      4 * 60 * 60_000,
+    );
     void window.pi.config.set({ locale: useAppStore.getState().locale });
     void useAppStore.getState().refreshScheduledTasks();
     const unsubScheduleChanged = window.pi.schedule.onChanged((tasks) => {
@@ -106,6 +111,7 @@ export default function App(): React.JSX.Element {
       unsubAgentCrash();
       unsubWorkspaceSandbox();
       unsubMenu();
+      clearInterval(updateTimer);
       window.removeEventListener("keydown", onKeyDown);
     };
   }, [handleEnvelope, loadCatalog]);

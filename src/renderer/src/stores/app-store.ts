@@ -21,6 +21,7 @@ import type {
   SlashCommandPayload,
   SubagentUpdatePayload,
   SessionTreeNode,
+  UpdateCheckPayload,
   ThinkingLevel,
   ToolInfoPayload,
   TrajectoryStepPayload,
@@ -31,6 +32,7 @@ import { applyTheme, loadThemePreference, type ThemePreference } from "@/lib/the
 import { applyLocale, loadLocalePreference, type Locale } from "@/lib/locale";
 import { t as translate } from "@shared/locales";
 import { samePath } from "@/lib/format";
+import { type SessionTimeFilter } from "@/lib/session-time";
 
 // ---------- types ----------
 
@@ -180,6 +182,10 @@ interface AppState {
   /** Which settings tab to show when the dialog opens. */
   settingsTab?: string;
   sidebarCollapsed: boolean;
+  sessionTimeFilter: SessionTimeFilter;
+  /** 最近一次新版本检测结果 */
+  updateInfo?: UpdateCheckPayload;
+  updateChecking: boolean;
   theme: ThemePreference;
   locale: Locale;
   /** "home" = 总览；"welcome" = 新建；"chat" = 会话；"schedule" / "deployments" = 整页 */
@@ -217,6 +223,8 @@ interface AppState {
   setTheme(pref: ThemePreference): void;
   setLocale(locale: Locale): void;
   toggleSidebar(): void;
+  setSessionTimeFilter(filter: SessionTimeFilter): void;
+  checkForUpdates(force?: boolean): Promise<void>;
   setAppMode(mode: ChatKind): void;
   setPreferredModel(model: ModelInfo): void;
   setCodingPreset(id: string): void;
@@ -344,6 +352,18 @@ const PREFERRED_MODEL_KEY = "bivor:preferred-model";
 const MODEL_THINKING_KEY = "bivor:model-thinking";
 const CODING_PRESET_KEY = "bivor:coding-preset";
 const SESSION_PRESETS_KEY = "bivor:session-presets";
+const TIME_FILTER_KEY = "bivor:session-time-filter";
+const UPDATE_NOTIFIED_KEY = "bivor:update-notified";
+
+function loadTimeFilter(): SessionTimeFilter {
+  try {
+    const raw = localStorage.getItem(TIME_FILTER_KEY);
+    if (raw === "all" || raw === "today" || raw === "7d" || raw === "30d") return raw;
+  } catch {
+    // ignore
+  }
+  return "all";
+}
 
 const THINKING_LEVELS: ThinkingLevel[] = [
   "off",
@@ -894,6 +914,9 @@ export const useAppStore = create<AppState>((set, get) => ({
   providers: [],
   settingsOpen: false,
   sidebarCollapsed: false,
+  sessionTimeFilter: loadTimeFilter(),
+  updateInfo: undefined,
+  updateChecking: false,
   theme: loadThemePreference(),
   locale: loadLocalePreference(),
   activeView: "home",
@@ -927,6 +950,52 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   toggleSidebar() {
     set((s) => ({ sidebarCollapsed: !s.sidebarCollapsed }));
+  },
+
+  setSessionTimeFilter(filter) {
+    try {
+      localStorage.setItem(TIME_FILTER_KEY, filter);
+    } catch {
+      // ignore
+    }
+    set({ sessionTimeFilter: filter });
+  },
+
+  async checkForUpdates(force) {
+    if (get().updateChecking) return;
+    set({ updateChecking: true });
+    try {
+      const info = await window.pi.updates.check(force);
+      set({ updateInfo: info });
+      // 每个新版本只弹一次系统通知；手动检查时用户就在界面上，无需再弹
+      if (info.hasUpdate && info.latest && !force && Notification.permission !== "denied") {
+        let notified: string | null = null;
+        try {
+          notified = localStorage.getItem(UPDATE_NOTIFIED_KEY);
+        } catch {
+          // ignore
+        }
+        if (notified !== info.latest) {
+          const locale = get().locale;
+          const n = new Notification(translate(locale, "updates.notifyTitle"), {
+            body: translate(locale, "updates.notifyBody", {
+              latest: info.latest,
+              current: info.current,
+            }),
+          });
+          n.onclick = () => window.open(info.url);
+          try {
+            localStorage.setItem(UPDATE_NOTIFIED_KEY, info.latest);
+          } catch {
+            // ignore
+          }
+        }
+      }
+    } catch {
+      // main 侧未就绪时忽略
+    } finally {
+      set({ updateChecking: false });
+    }
   },
 
   setPreferredModel(model) {
