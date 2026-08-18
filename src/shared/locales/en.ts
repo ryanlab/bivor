@@ -40,7 +40,7 @@ export const en: Messages = {
     authenticated: "Signed in",
   },
   app: {
-    name: "Bivor",
+    name: "Bivor Desktop",
     tagline: "A desktop workspace for the pi coding agent",
   },
   locale: {
@@ -139,7 +139,7 @@ export const en: Messages = {
     aboutSessionsPath: "Session data path",
     aboutAuthPath: "Credentials path",
     aboutInterop: "Bivor Desktop is fully compatible with the PI CLI",
-    aboutPi: "About PI Coding Agent",
+    aboutPi: "About PI",
     aboutPiSite: "Visit pi.dev",
     aboutCurrentVersion: "Current version",
     aboutCheck: "Check for updates",

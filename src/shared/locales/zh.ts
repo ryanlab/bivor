@@ -38,7 +38,7 @@ export const zh = {
     authenticated: "已认证",
   },
   app: {
-    name: "Bivor",
+    name: "Bivor Desktop",
     tagline: "pi coding agent 的桌面工作台",
   },
   locale: {
@@ -137,7 +137,7 @@ export const zh = {
     aboutSessionsPath: "会话数据存储路径",
     aboutAuthPath: "凭证数据存储路径",
     aboutInterop: "Bivor Desktop 与 PI CLI 完全互通",
-    aboutPi: "关于 PI Coding Agent",
+    aboutPi: "关于 PI",
     aboutPiSite: "前往 pi.dev",
     aboutCurrentVersion: "当前版本",
     aboutCheck: "检查更新",

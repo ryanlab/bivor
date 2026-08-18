@@ -779,6 +779,7 @@ function BarkTab(): React.JSX.Element {
 }
 
 const REPO_URL = "https://github.com/ryanlab/bivor";
+const SITE_URL = "https://bivor.dev";
 
 /** lucide 已移除品牌图标，这里内联 GitHub 标志 */
 function GithubIcon({ size = 14 }: { size?: number }): React.JSX.Element {
@@ -814,17 +815,20 @@ function AboutLink({
   icon,
   label,
   hint,
+  title,
 }: {
   href: string;
   icon: React.ReactNode;
   label: string;
   hint?: string;
+  title?: string;
 }): React.JSX.Element {
   return (
     <a
       href={href}
       target="_blank"
       rel="noreferrer"
+      title={title}
       className="flex h-12 items-center gap-3 px-2.5 transition-colors hover:bg-bg-hover"
     >
       <span className="shrink-0 text-fg-muted">{icon}</span>
@@ -836,26 +840,26 @@ function AboutLink({
   );
 }
 
-const aboutBtn =
-  "inline-flex h-8 shrink-0 items-center rounded-lg border border-border px-3.5 text-xs text-fg-secondary transition-colors hover:bg-bg-hover hover:text-fg disabled:opacity-60";
-
 function AboutRow({
   icon,
   label,
   hint,
   children,
   onClick,
+  title,
 }: {
   icon: React.ReactNode;
   label: string;
   hint?: string;
   children?: React.ReactNode;
   onClick?: () => void;
+  title?: string;
 }): React.JSX.Element {
   return (
     <div
       role={onClick ? "button" : undefined}
       tabIndex={onClick ? 0 : undefined}
+      title={title}
       onClick={onClick}
       onKeyDown={
         onClick
@@ -908,40 +912,49 @@ function AboutTab(): React.JSX.Element {
         <span className="font-serif-display text-lg text-fg">{t("app.name")}</span>
         {versions && <span className="text-xs text-fg-muted">v{versions.appVersion}</span>}
       </div>
-      <div className="rounded-xl border border-border">
+      <div className="overflow-hidden rounded-xl border border-border">
         <AboutRow
           icon={<Info size={14} />}
           label={t("settings.aboutCurrentVersion")}
           hint={versions ? `v${versions.appVersion}` : undefined}
+          title={
+            updateInfo?.hasUpdate
+              ? t("updates.availableTitle", { latest: updateInfo.latest! })
+              : t("updates.checkTitle")
+          }
+          onClick={
+            updateChecking
+              ? undefined
+              : updateInfo?.hasUpdate
+                ? () => window.open(updateInfo.url)
+                : () => void manualCheck()
+          }
         >
+          {updateChecking && (
+            <span className="text-xs text-fg-muted">{t("updates.checking")}</span>
+          )}
           {checkedOnce && !updateChecking && updateInfo && !updateInfo.hasUpdate && (
             <span className="text-xs text-fg-muted">
               {updateInfo.error ? t("updates.checkFailed") : t("updates.upToDate")}
             </span>
           )}
-          {updateInfo?.hasUpdate ? (
+          {updateInfo?.hasUpdate && (
             <button
               type="button"
               title={t("updates.availableTitle", { latest: updateInfo.latest! })}
-              onClick={() => window.open(updateInfo.url)}
+              onClick={(e) => {
+                e.stopPropagation();
+                window.open(updateInfo.url);
+              }}
               className="inline-flex h-8 shrink-0 items-center rounded-lg bg-accent px-3.5 text-xs text-white transition-opacity hover:opacity-90"
             >
               {t("settings.aboutDownload", { v: updateInfo.latest! })}
-            </button>
-          ) : (
-            <button
-              type="button"
-              disabled={updateChecking}
-              onClick={() => void manualCheck()}
-              className={aboutBtn}
-            >
-              {updateChecking ? t("updates.checking") : t("settings.aboutCheck")}
             </button>
           )}
         </AboutRow>
         <AboutSep />
         <AboutLink
-          href={REPO_URL}
+          href={SITE_URL}
           icon={<Globe size={14} />}
           label={t("settings.aboutWebsite")}
         />
@@ -989,24 +1002,18 @@ function AboutPiTab(): React.JSX.Element {
   return (
     <div className="space-y-3 text-[13px] leading-relaxed text-fg-secondary">
       <div className="flex items-baseline gap-2">
-        <span className="font-serif-display text-lg text-fg">PI Coding Agent</span>
+        <span className="font-serif-display text-lg text-fg">PI</span>
         {versions && <span className="text-xs text-fg-muted">v{versions.piVersion}</span>}
       </div>
 
-      <div className="rounded-xl border border-border">
-        <AboutRow
+      <div className="overflow-hidden rounded-xl border border-border">
+        <AboutLink
+          href="https://pi.dev"
           icon={<Bot size={14} />}
           label={t("settings.aboutPi")}
           hint={versions ? `v${versions.piVersion}` : undefined}
-        >
-          <button
-            type="button"
-            onClick={() => window.open("https://pi.dev")}
-            className={aboutBtn}
-          >
-            {t("settings.aboutPiSite")}
-          </button>
-        </AboutRow>
+          title={t("settings.aboutPiSite")}
+        />
         <AboutSep />
         <AboutRow
           icon={<FolderOpen size={14} />}
