@@ -186,6 +186,10 @@ export function Sidebar(): React.JSX.Element {
   const showWelcome = useAppStore((s) => s.showWelcome);
   const activeView = useAppStore((s) => s.activeView);
   const setResourcesOpen = useAppStore((s) => s.setResourcesOpen);
+  const resourcesOpen = useAppStore((s) => s.resourcesOpen);
+  const usageOpen = useAppStore((s) => s.usageOpen);
+  const monitorOpen = useAppStore((s) => s.monitorOpen);
+  const settingsOpen = useAppStore((s) => s.settingsOpen);
   const isDaily = appMode === "daily";
   const sessionCwd = isDaily ? dailyCwd : activeProjectPath;
   const visibleChatIds = chatOrder.filter((id) => chats[id]?.kind === appMode);
@@ -416,37 +420,37 @@ export function Sidebar(): React.JSX.Element {
       </div>
 
       {/* Footer */}
-      <div className="p-2">
+      <div className="flex flex-col gap-1 p-2">
         <button
           type="button"
           onClick={() => setResourcesOpen(true)}
-          className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-xs text-fg-secondary transition-colors hover:bg-bg-hover"
+          className={cn(NAV_ITEM, resourcesOpen && NAV_ITEM_ON)}
         >
-          <Package size={14} />
+          <Package size={15} strokeWidth={1.7} />
           {t("sidebar.resources")}
         </button>
         <button
           type="button"
           onClick={() => useAppStore.getState().setUsageOpen(true)}
-          className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-xs text-fg-secondary transition-colors hover:bg-bg-hover"
+          className={cn(NAV_ITEM, usageOpen && NAV_ITEM_ON)}
         >
-          <BarChart3 size={14} />
+          <BarChart3 size={15} strokeWidth={1.7} />
           {t("sidebar.usage")}
         </button>
         <button
           type="button"
           onClick={() => useAppStore.getState().setMonitorOpen(true)}
-          className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-xs text-fg-secondary transition-colors hover:bg-bg-hover"
+          className={cn(NAV_ITEM, monitorOpen && NAV_ITEM_ON)}
         >
-          <Activity size={14} />
+          <Activity size={15} strokeWidth={1.7} />
           {t("sidebar.monitor")}
         </button>
         <button
           type="button"
           onClick={() => setSettingsOpen(true)}
-          className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-xs text-fg-secondary transition-colors hover:bg-bg-hover"
+          className={cn(NAV_ITEM, settingsOpen && NAV_ITEM_ON)}
         >
-          <Settings size={14} />
+          <Settings size={15} strokeWidth={1.7} />
           {t("common.settings")}
         </button>
       </div>
